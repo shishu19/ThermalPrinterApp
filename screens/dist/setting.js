@@ -193,7 +193,7 @@ var Setting = function () {
         init();
     }, []);
     return (react_1["default"].createElement(react_native_1.ScrollView, { contentContainerStyle: styles.container },
-        react_1["default"].createElement(react_native_1.Text, { style: styles.title }, "BLE Thermal Printer App"),
+        react_1["default"].createElement(react_native_1.Text, { style: styles.title }, "Printer Settings"),
         react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "Available Printers:"),
         printers.length > 0 ? (printers.map(function (printer, index) { return (react_1["default"].createElement(react_native_1.TouchableOpacity, { key: index, style: styles.printerItem, onPress: function () { return connectToPrinter(printer.inner_mac_address, printer.device_name); } },
             react_1["default"].createElement(react_native_1.Text, { style: styles.printerName }, printer.device_name),

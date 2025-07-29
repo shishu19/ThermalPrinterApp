@@ -134,7 +134,7 @@ Grand Total
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>BLE Thermal Printer App</Text>
+      <Text style={styles.title}>Printer Settings</Text>
 
       <Text style={styles.label}>Available Printers:</Text>
       {printers.length > 0 ? (
