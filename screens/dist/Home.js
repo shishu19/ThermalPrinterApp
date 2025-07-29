@@ -56,13 +56,14 @@ var firebaseConfig_1 = require("./firebaseConfig");
 var database_1 = require("firebase/database");
 var dayjs_1 = require("dayjs");
 var customParseFormat_1 = require("dayjs/plugin/customParseFormat");
-//npx react-native run-android
 dayjs_1["default"].extend(customParseFormat_1["default"]);
 var Home = function (_a) {
     var navigation = _a.navigation;
     var _b = react_1.useState(null), connectedInfo = _b[0], setConnectedInfo = _b[1];
     var _c = react_1.useState([]), records = _c[0], setRecords = _c[1];
-    var totalAmount = records.reduce(function (sum, item) { return sum + parseFloat(item.amount); }, 0);
+    var _d = react_1.useState([]), filteredRecords = _d[0], setFilteredRecords = _d[1];
+    var _e = react_1.useState(''), searchQuery = _e[0], setSearchQuery = _e[1];
+    var totalAmount = filteredRecords.reduce(function (sum, item) { return sum + parseFloat(item.amount); }, 0);
     react_1.useLayoutEffect(function () {
         navigation.setOptions({
             title: 'Dashboard',
@@ -73,7 +74,6 @@ var Home = function (_a) {
             headerTitleStyle: {
                 fontWeight: 'bold'
             },
-            // eslint-disable-next-line react/no-unstable-nested-components
             headerRight: function () {
                 return connectedInfo ? (react_1["default"].createElement(react_native_1.View, { style: styles.headerRightContainer },
                     react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('Setting'); } },
@@ -100,6 +100,7 @@ var Home = function (_a) {
                                 case 1:
                                     _a.sent();
                                     setRecords(function (prev) { return prev.filter(function (item) { return item.id !== id; }); });
+                                    setFilteredRecords(function (prev) { return prev.filter(function (item) { return item.id !== id; }); });
                                     return [3 /*break*/, 3];
                                 case 2:
                                     error_1 = _a.sent();
@@ -159,12 +160,14 @@ var Home = function (_a) {
                             loadedRecords.sort(function (a, b) {
                                 var dateA = dayjs_1["default"](a.date, 'DD-MM-YYYY hh:mm A');
                                 var dateB = dayjs_1["default"](b.date, 'DD-MM-YYYY hh:mm A');
-                                return dateB.valueOf() - dateA.valueOf(); // Newest first
+                                return dateB.valueOf() - dateA.valueOf();
                             });
                             setRecords(loadedRecords);
+                            setFilteredRecords(loadedRecords);
                         }
                         else {
                             setRecords([]);
+                            setFilteredRecords([]);
                         }
                         return [2 /*return*/];
                 }
@@ -172,19 +175,30 @@ var Home = function (_a) {
         }); };
         init();
     }, []));
+    var handleSearch = function (text) {
+        setSearchQuery(text);
+        var lowerText = text.toLowerCase();
+        var filtered = records.filter(function (item) {
+            return item.name.toLowerCase().includes(lowerText) ||
+                item.date.toLowerCase().includes(lowerText) ||
+                item.status.toLowerCase().includes(lowerText);
+        });
+        setFilteredRecords(filtered);
+    };
     return (react_1["default"].createElement(react_native_1.View, { style: styles.container },
+        react_1["default"].createElement(react_native_1.TextInput, { style: styles.searchInput, placeholder: "Search by Name, Date or Status", value: searchQuery, onChangeText: handleSearch }),
         react_1["default"].createElement(react_native_1.View, { style: styles.card },
             react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('EmployeeForm'); }, style: styles.addButton },
                 react_1["default"].createElement(react_native_1.Text, { style: styles.addButtonText }, "+")),
             react_1["default"].createElement(react_native_1.View, { style: styles.stat },
-                react_1["default"].createElement(react_native_1.Text, { style: styles.statValue }, records.length),
+                react_1["default"].createElement(react_native_1.Text, { style: styles.statValue }, filteredRecords.length),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.statLabel }, "Total Records")),
             react_1["default"].createElement(react_native_1.View, { style: styles.stat },
                 react_1["default"].createElement(react_native_1.Text, { style: styles.statValue },
                     "\u20B9 ",
                     totalAmount),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.statLabel }, "Total Amount"))),
-        react_1["default"].createElement(react_native_1.FlatList, { data: records, keyExtractor: function (item) { return item.id; }, renderItem: function (_a) {
+        react_1["default"].createElement(react_native_1.FlatList, { data: filteredRecords, keyExtractor: function (item) { return item.id; }, renderItem: function (_a) {
                 var item = _a.item, index = _a.index;
                 return (react_1["default"].createElement(react_native_1.View, { style: styles.recordCardWrapper },
                     react_1["default"].createElement(react_native_1.TouchableOpacity, { style: styles.deleteIcon, onPress: function () { return handleDelete(item.id); } },
@@ -354,5 +368,15 @@ var styles = react_native_1.StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 14,
         padding: 4
+    },
+    searchInput: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginBottom: 10,
+        fontSize: 16,
+        borderColor: '#ccc',
+        borderWidth: 1
     }
 });

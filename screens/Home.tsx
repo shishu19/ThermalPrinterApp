@@ -6,6 +6,7 @@ import {
   Alert,
   TouchableOpacity,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,7 +17,7 @@ import app from './firebaseConfig';
 import { getDatabase, ref, get, remove } from 'firebase/database';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
-//npx react-native run-android
+
 dayjs.extend(customParseFormat);
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -24,20 +25,21 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 const Home = ({ navigation }: Props) => {
   const [connectedInfo, setConnectedInfo] = useState<{ mac: string; name: string } | null>(null);
   const [records, setRecords] = useState<any[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const totalAmount = records.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+  const totalAmount = filteredRecords.reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
   useLayoutEffect(() => {
     navigation.setOptions({
       title: 'Dashboard',
       headerStyle: {
-        backgroundColor: '#2196F3', // Blue background
+        backgroundColor: '#2196F3',
       },
-      headerTintColor: '#fff', // White back button and title
+      headerTintColor: '#fff',
       headerTitleStyle: {
-      fontWeight: 'bold',
+        fontWeight: 'bold',
       },
-      // eslint-disable-next-line react/no-unstable-nested-components
       headerRight: () =>
         connectedInfo ? (
           <View style={styles.headerRightContainer}>
@@ -64,6 +66,7 @@ const Home = ({ navigation }: Props) => {
             const db = getDatabase(app);
             await remove(ref(db, `/donations/${id}`));
             setRecords((prev) => prev.filter((item) => item.id !== id));
+            setFilteredRecords((prev) => prev.filter((item) => item.id !== id));
           } catch (error) {
             console.error('Delete failed:', error);
             Alert.alert('Error', 'Failed to delete the record.');
@@ -103,11 +106,13 @@ const Home = ({ navigation }: Props) => {
           loadedRecords.sort((a, b) => {
             const dateA = dayjs(a.date, 'DD-MM-YYYY hh:mm A');
             const dateB = dayjs(b.date, 'DD-MM-YYYY hh:mm A');
-            return dateB.valueOf() - dateA.valueOf(); // Newest first
+            return dateB.valueOf() - dateA.valueOf();
           });
           setRecords(loadedRecords);
+          setFilteredRecords(loadedRecords);
         } else {
           setRecords([]);
+          setFilteredRecords([]);
         }
       };
 
@@ -115,15 +120,35 @@ const Home = ({ navigation }: Props) => {
     }, [])
   );
 
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    const lowerText = text.toLowerCase();
+
+    const filtered = records.filter(
+      (item) =>
+        item.name.toLowerCase().includes(lowerText) ||
+        item.date.toLowerCase().includes(lowerText) ||
+        item.status.toLowerCase().includes(lowerText)
+    );
+
+    setFilteredRecords(filtered);
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header Summary Card */}
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search by Name, Date or Status"
+        value={searchQuery}
+        onChangeText={handleSearch}
+      />
+
       <View style={styles.card}>
         <TouchableOpacity onPress={() => navigation.navigate('EmployeeForm')} style={styles.addButton}>
           <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
         <View style={styles.stat}>
-          <Text style={styles.statValue}>{records.length}</Text>
+          <Text style={styles.statValue}>{filteredRecords.length}</Text>
           <Text style={styles.statLabel}>Total Records</Text>
         </View>
         <View style={styles.stat}>
@@ -132,9 +157,8 @@ const Home = ({ navigation }: Props) => {
         </View>
       </View>
 
-      {/* Records List */}
       <FlatList
-        data={records}
+        data={filteredRecords}
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => (
           <View style={styles.recordCardWrapper}>
@@ -178,7 +202,6 @@ const Home = ({ navigation }: Props) => {
         )}
       />
 
-      {/* Footer */}
       <Text
         style={[
           styles.footer,
@@ -319,5 +342,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 4,
+  },
+  searchInput: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    fontSize: 16,
+    borderColor: '#ccc',
+    borderWidth: 1,
   },
 });
