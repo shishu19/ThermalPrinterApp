@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "51274876801",
+    "project_id": "collection-ffc18",
+    "storage_bucket": "collection-ffc18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51274876801:android:7b6b3bdb6544765a5aca80",
+        "android_client_info": {
+          "package_name": "com.thermalprinterapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEsR6XO0em2KiLRmUT8b_Z9IaH168q4Og"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
