@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState, useCallback } from 'react';
+import React, { useLayoutEffect, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
+  Modal,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,6 +18,8 @@ import app from './firebaseConfig';
 import { getDatabase, ref, get, remove } from 'firebase/database';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
+
 
 dayjs.extend(customParseFormat);
 
@@ -27,19 +30,22 @@ const Home = ({ navigation }: Props) => {
   const [records, setRecords] = useState<any[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [isStartPickerVisible, setStartPickerVisible] = useState(false);
+  const [isEndPickerVisible, setEndPickerVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
+  const [tempEndDate, setTempEndDate] = useState<Date | null>(null);
 
   const totalAmount = filteredRecords.reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
   useLayoutEffect(() => {
     navigation.setOptions({
       title: 'Dashboard',
-      headerStyle: {
-        backgroundColor: '#2196F3',
-      },
+      headerStyle: { backgroundColor: '#2196F3' },
       headerTintColor: '#fff',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
+      headerTitleStyle: { fontWeight: 'bold' },
       headerRight: () =>
         connectedInfo ? (
           <View style={styles.headerRightContainer}>
@@ -109,39 +115,129 @@ const Home = ({ navigation }: Props) => {
             return dateB.valueOf() - dateA.valueOf();
           });
           setRecords(loadedRecords);
-          setFilteredRecords(loadedRecords);
         } else {
           setRecords([]);
-          setFilteredRecords([]);
         }
       };
 
       init();
     }, [])
   );
+  const clearFilters = () => {
+  // setSearchQuery('');
+  setStartDate(null);
+  setEndDate(null);
+  setTempStartDate(null);
+  setTempEndDate(null);
+  setFilterModalVisible(false);
+};
 
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    const lowerText = text.toLowerCase();
+  useEffect(() => {
+    let filtered = records;
 
-    const filtered = records.filter(
-      (item) =>
-        item.name.toLowerCase().includes(lowerText) ||
-        item.date.toLowerCase().includes(lowerText) ||
-        item.status.toLowerCase().includes(lowerText)
-    );
+    if (searchQuery.trim()) {
+      const lowerText = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (item) =>
+          item.name.toLowerCase().includes(lowerText) ||
+          item.date.toLowerCase().includes(lowerText) ||
+          item.status.toLowerCase().includes(lowerText)
+      );
+    }
+
+    if (startDate && endDate) {
+      filtered = filtered.filter((item) => {
+        const recordDate = dayjs(item.date, 'DD-MM-YYYY hh:mm A');
+        return (
+          recordDate.isAfter(dayjs(startDate).startOf('day').subtract(1, 'minute')) &&
+          recordDate.isBefore(dayjs(endDate).endOf('day').add(1, 'minute'))
+        );
+      });
+    }
 
     setFilteredRecords(filtered);
-  };
+  }, [searchQuery, startDate, endDate, records]);
 
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search by Name, Date or Status"
-        value={searchQuery}
-        onChangeText={handleSearch}
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by Name, Date or Status"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <TouchableOpacity
+          onPress={() => {
+            setTempStartDate(startDate);
+            setTempEndDate(endDate);
+            setFilterModalVisible(true);
+          }}
+          style={styles.filterButton}
+        >
+          <Text style={{ fontSize: 18 }}>🔽</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal visible={filterModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Filter by Date</Text>
+
+            <Text style={styles.label}>Start Date</Text>
+            <TouchableOpacity onPress={() => setStartPickerVisible(true)} style={styles.dateInput}>
+              <Text>{tempStartDate ? dayjs(tempStartDate).format('DD-MM-YYYY') : 'Start Date'}</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.label}>End Date</Text>
+            <TouchableOpacity onPress={() => setEndPickerVisible(true)} style={styles.dateInput}>
+              <Text>{tempEndDate ? dayjs(tempEndDate).format('DD-MM-YYYY') : 'End Date'}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={styles.modalBtn}
+                onPress={() => {
+                  setStartDate(tempStartDate);
+                  setEndDate(tempEndDate);
+                  setFilterModalVisible(false);
+                }}
+              >
+                <Text style={{ color: 'white' }}>Apply</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#ccc' }]}
+                onPress={() => setFilterModalVisible(false)}
+              >
+                <Text>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: 'tomato' }]} onPress={clearFilters}>
+                <Text style={{ color: 'white' }}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <DateTimePickerModal
+          isVisible={isStartPickerVisible}
+          mode="date"
+          onConfirm={(date) => {
+            setTempStartDate(date);
+            setStartPickerVisible(false);
+          }}
+          onCancel={() => setStartPickerVisible(false)}
+        />
+        <DateTimePickerModal
+          isVisible={isEndPickerVisible}
+          mode="date"
+          onConfirm={(date) => {
+            setTempEndDate(date);
+            setEndPickerVisible(false);
+          }}
+          onCancel={() => setEndPickerVisible(false)}
+        />
+      </Modal>
 
       <View style={styles.card}>
         <TouchableOpacity onPress={() => navigation.navigate('EmployeeForm')} style={styles.addButton}>
@@ -202,12 +298,7 @@ const Home = ({ navigation }: Props) => {
         )}
       />
 
-      <Text
-        style={[
-          styles.footer,
-          connectedInfo ? styles.connected : styles.disconnected,
-        ]}
-      >
+      <Text style={[styles.footer, connectedInfo ? styles.connected : styles.disconnected]}>
         {connectedInfo
           ? `🖨 Connected to: ${connectedInfo.name} (${connectedInfo.mac})`
           : '🔌 No printer connected'}
@@ -343,14 +434,78 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 4,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   searchInput: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 10,
     fontSize: 16,
     borderColor: '#ccc',
     borderWidth: 1,
+  },
+  filterButton: {
+    marginLeft: 10,
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    width: '85%',
+    padding: 20,
+    borderRadius: 10,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalBtn: {
+    flex: 1,
+    padding: 12,
+    marginHorizontal: 5,
+    borderRadius: 8,
+    backgroundColor: '#2196F3',
+    alignItems: 'center',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    height: 50, // Increased height
+    justifyContent: 'center',
+  },
+  label: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 4,
+    marginTop: 10,
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#000',
   },
 });

@@ -56,6 +56,7 @@ var firebaseConfig_1 = require("./firebaseConfig");
 var database_1 = require("firebase/database");
 var dayjs_1 = require("dayjs");
 var customParseFormat_1 = require("dayjs/plugin/customParseFormat");
+var react_native_modal_datetime_picker_1 = require("react-native-modal-datetime-picker");
 dayjs_1["default"].extend(customParseFormat_1["default"]);
 var Home = function (_a) {
     var navigation = _a.navigation;
@@ -63,17 +64,20 @@ var Home = function (_a) {
     var _c = react_1.useState([]), records = _c[0], setRecords = _c[1];
     var _d = react_1.useState([]), filteredRecords = _d[0], setFilteredRecords = _d[1];
     var _e = react_1.useState(''), searchQuery = _e[0], setSearchQuery = _e[1];
+    var _f = react_1.useState(null), startDate = _f[0], setStartDate = _f[1];
+    var _g = react_1.useState(null), endDate = _g[0], setEndDate = _g[1];
+    var _h = react_1.useState(false), isStartPickerVisible = _h[0], setStartPickerVisible = _h[1];
+    var _j = react_1.useState(false), isEndPickerVisible = _j[0], setEndPickerVisible = _j[1];
+    var _k = react_1.useState(false), filterModalVisible = _k[0], setFilterModalVisible = _k[1];
+    var _l = react_1.useState(null), tempStartDate = _l[0], setTempStartDate = _l[1];
+    var _m = react_1.useState(null), tempEndDate = _m[0], setTempEndDate = _m[1];
     var totalAmount = filteredRecords.reduce(function (sum, item) { return sum + parseFloat(item.amount); }, 0);
     react_1.useLayoutEffect(function () {
         navigation.setOptions({
             title: 'Dashboard',
-            headerStyle: {
-                backgroundColor: '#2196F3'
-            },
+            headerStyle: { backgroundColor: '#2196F3' },
             headerTintColor: '#fff',
-            headerTitleStyle: {
-                fontWeight: 'bold'
-            },
+            headerTitleStyle: { fontWeight: 'bold' },
             headerRight: function () {
                 return connectedInfo ? (react_1["default"].createElement(react_native_1.View, { style: styles.headerRightContainer },
                     react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('Setting'); } },
@@ -163,11 +167,9 @@ var Home = function (_a) {
                                 return dateB.valueOf() - dateA.valueOf();
                             });
                             setRecords(loadedRecords);
-                            setFilteredRecords(loadedRecords);
                         }
                         else {
                             setRecords([]);
-                            setFilteredRecords([]);
                         }
                         return [2 /*return*/];
                 }
@@ -175,18 +177,71 @@ var Home = function (_a) {
         }); };
         init();
     }, []));
-    var handleSearch = function (text) {
-        setSearchQuery(text);
-        var lowerText = text.toLowerCase();
-        var filtered = records.filter(function (item) {
-            return item.name.toLowerCase().includes(lowerText) ||
-                item.date.toLowerCase().includes(lowerText) ||
-                item.status.toLowerCase().includes(lowerText);
-        });
-        setFilteredRecords(filtered);
+    var clearFilters = function () {
+        // setSearchQuery('');
+        setStartDate(null);
+        setEndDate(null);
+        setTempStartDate(null);
+        setTempEndDate(null);
+        setFilterModalVisible(false);
     };
+    react_1.useEffect(function () {
+        var filtered = records;
+        if (searchQuery.trim()) {
+            var lowerText_1 = searchQuery.toLowerCase();
+            filtered = filtered.filter(function (item) {
+                return item.name.toLowerCase().includes(lowerText_1) ||
+                    item.date.toLowerCase().includes(lowerText_1) ||
+                    item.status.toLowerCase().includes(lowerText_1);
+            });
+        }
+        if (startDate && endDate) {
+            filtered = filtered.filter(function (item) {
+                var recordDate = dayjs_1["default"](item.date, 'DD-MM-YYYY hh:mm A');
+                return (recordDate.isAfter(dayjs_1["default"](startDate).startOf('day').subtract(1, 'minute')) &&
+                    recordDate.isBefore(dayjs_1["default"](endDate).endOf('day').add(1, 'minute')));
+            });
+        }
+        setFilteredRecords(filtered);
+    }, [searchQuery, startDate, endDate, records]);
     return (react_1["default"].createElement(react_native_1.View, { style: styles.container },
-        react_1["default"].createElement(react_native_1.TextInput, { style: styles.searchInput, placeholder: "Search by Name, Date or Status", value: searchQuery, onChangeText: handleSearch }),
+        react_1["default"].createElement(react_native_1.View, { style: styles.searchRow },
+            react_1["default"].createElement(react_native_1.TextInput, { style: styles.searchInput, placeholder: "Search by Name, Date or Status", value: searchQuery, onChangeText: setSearchQuery }),
+            react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () {
+                    setTempStartDate(startDate);
+                    setTempEndDate(endDate);
+                    setFilterModalVisible(true);
+                }, style: styles.filterButton },
+                react_1["default"].createElement(react_native_1.Text, { style: { fontSize: 18 } }, "\uD83D\uDD3D"))),
+        react_1["default"].createElement(react_native_1.Modal, { visible: filterModalVisible, transparent: true, animationType: "slide" },
+            react_1["default"].createElement(react_native_1.View, { style: styles.modalOverlay },
+                react_1["default"].createElement(react_native_1.View, { style: styles.modalContent },
+                    react_1["default"].createElement(react_native_1.Text, { style: styles.modalTitle }, "Filter by Date"),
+                    react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "Start Date"),
+                    react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return setStartPickerVisible(true); }, style: styles.dateInput },
+                        react_1["default"].createElement(react_native_1.Text, null, tempStartDate ? dayjs_1["default"](tempStartDate).format('DD-MM-YYYY') : 'Start Date')),
+                    react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "End Date"),
+                    react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return setEndPickerVisible(true); }, style: styles.dateInput },
+                        react_1["default"].createElement(react_native_1.Text, null, tempEndDate ? dayjs_1["default"](tempEndDate).format('DD-MM-YYYY') : 'End Date')),
+                    react_1["default"].createElement(react_native_1.View, { style: styles.modalButtonRow },
+                        react_1["default"].createElement(react_native_1.TouchableOpacity, { style: styles.modalBtn, onPress: function () {
+                                setStartDate(tempStartDate);
+                                setEndDate(tempEndDate);
+                                setFilterModalVisible(false);
+                            } },
+                            react_1["default"].createElement(react_native_1.Text, { style: { color: 'white' } }, "Apply")),
+                        react_1["default"].createElement(react_native_1.TouchableOpacity, { style: [styles.modalBtn, { backgroundColor: '#ccc' }], onPress: function () { return setFilterModalVisible(false); } },
+                            react_1["default"].createElement(react_native_1.Text, null, "Cancel")),
+                        react_1["default"].createElement(react_native_1.TouchableOpacity, { style: [styles.modalBtn, { backgroundColor: 'tomato' }], onPress: clearFilters },
+                            react_1["default"].createElement(react_native_1.Text, { style: { color: 'white' } }, "Clear"))))),
+            react_1["default"].createElement(react_native_modal_datetime_picker_1["default"], { isVisible: isStartPickerVisible, mode: "date", onConfirm: function (date) {
+                    setTempStartDate(date);
+                    setStartPickerVisible(false);
+                }, onCancel: function () { return setStartPickerVisible(false); } }),
+            react_1["default"].createElement(react_native_modal_datetime_picker_1["default"], { isVisible: isEndPickerVisible, mode: "date", onConfirm: function (date) {
+                    setTempEndDate(date);
+                    setEndPickerVisible(false);
+                }, onCancel: function () { return setEndPickerVisible(false); } })),
         react_1["default"].createElement(react_native_1.View, { style: styles.card },
             react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('EmployeeForm'); }, style: styles.addButton },
                 react_1["default"].createElement(react_native_1.Text, { style: styles.addButtonText }, "+")),
@@ -236,10 +291,7 @@ var Home = function (_a) {
                             } },
                             react_1["default"].createElement(react_native_1.Text, { style: { fontSize: 18 } }, "\uD83D\uDDA8")))));
             } }),
-        react_1["default"].createElement(react_native_1.Text, { style: [
-                styles.footer,
-                connectedInfo ? styles.connected : styles.disconnected,
-            ] }, connectedInfo
+        react_1["default"].createElement(react_native_1.Text, { style: [styles.footer, connectedInfo ? styles.connected : styles.disconnected] }, connectedInfo
             ? "\uD83D\uDDA8 Connected to: " + connectedInfo.name + " (" + connectedInfo.mac + ")"
             : '🔌 No printer connected')));
 };
@@ -369,14 +421,78 @@ var styles = react_native_1.StyleSheet.create({
         borderRadius: 14,
         padding: 4
     },
+    searchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10
+    },
     searchInput: {
+        flex: 1,
         backgroundColor: '#fff',
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
-        marginBottom: 10,
         fontSize: 16,
         borderColor: '#ccc',
         borderWidth: 1
+    },
+    filterButton: {
+        marginLeft: 10,
+        padding: 10,
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ccc'
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        width: '85%',
+        padding: 20,
+        borderRadius: 10,
+        elevation: 5
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 12,
+        textAlign: 'center'
+    },
+    modalButtonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20
+    },
+    modalBtn: {
+        flex: 1,
+        padding: 12,
+        marginHorizontal: 5,
+        borderRadius: 8,
+        backgroundColor: '#2196F3',
+        alignItems: 'center'
+    },
+    dateInput: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        padding: 10,
+        marginBottom: 10,
+        height: 50,
+        justifyContent: 'center'
+    },
+    label: {
+        fontSize: 14,
+        color: '#444',
+        marginBottom: 4,
+        marginTop: 10
+    },
+    dateText: {
+        fontSize: 16,
+        color: '#000'
     }
 });
