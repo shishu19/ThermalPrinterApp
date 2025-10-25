@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useLayoutEffect, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,19 +24,21 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EmployeeForm'>;
 const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   const {
     id = '',
+    serialNumber: initialSerialNumber = '',
     name: initialName = '',
     amount: initialAmount = '',
     receiver: initialReceiver = '',
     mobile: initialMobile = '',
     paymentMode: initialPaymentMode = 'Cash',
     status: initialStatus = 'Pending',
-    date,
+    date: initialDate = '', // ✅ incoming date from Home
     mode = 'add',
   } = route.params || {};
 
   const isEditMode = mode === 'edit';
 
   const [name, setName] = useState(initialName);
+  const [serialNumber, setSerialNumber] = useState(initialSerialNumber || '');
   const [amount, setAmount] = useState(initialAmount ? String(initialAmount) : '');
   const [receiver, setReceiver] = useState(initialReceiver);
   const [mobile, setMobile] = useState(initialMobile);
@@ -45,6 +47,28 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   const [showPreview, setShowPreview] = useState(isEditMode);
   const [isEditing, setIsEditing] = useState(!isEditMode);
   const [connectedInfo, setConnectedInfo] = useState<{ mac: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [date, setDate] = useState(initialDate || ''); // ✅ Store the correct date
+
+  // ✅ Generate unique serial number with date
+  const generateSerialNumber = () => {
+    const now = new Date();
+    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
+      now.getDate()
+    ).padStart(2, '0')}`;
+    const randomPart = Math.floor(1000 + Math.random() * 9000); // random 4-digit
+    return `SN-${datePart}-${randomPart}`;
+  };
+
+  useEffect(() => {
+    if (!isEditMode && !serialNumber) {
+      const newSN = generateSerialNumber();
+      setSerialNumber(newSN);
+      const now = new Date();
+      setDate(getCurrentDateTime());
+    }
+  }, [isEditMode, serialNumber,date]);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,14 +99,9 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: 'Donation',
-      headerStyle: {
-        backgroundColor: '#2196F3', // Blue background
-      },
-      headerTintColor: '#fff', // White back button and title
-      headerTitleStyle: {
-      fontWeight: 'bold',
-      },
-      // eslint-disable-next-line react/no-unstable-nested-components
+      headerStyle: { backgroundColor: '#2196F3' },
+      headerTintColor: '#fff',
+      headerTitleStyle: { fontWeight: 'bold' },
       headerRight: () =>
         connectedInfo ? (
           <TouchableOpacity onPress={() => navigation.navigate('Setting')} style={{ marginRight: 10 }}>
@@ -108,7 +127,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     return `${day}-${month}-${year} ${formattedHours}:${minutes} ${ampm}`;
   };
 
-  const currentDate = date ? formatDate(new Date()) : formatDate(new Date());
+  const getCurrentDateTime = () => formatDate(new Date());
 
   const validateFields = () => {
     if (!name.trim() || !amount.trim() || !receiver.trim()) {
@@ -127,14 +146,18 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   const handleAddOrEdit = async () => {
     if (!validateFields()) return;
 
+    setLoading(true);
+
+    // ✅ Use updated date (if edited)
     const formData = {
+      serialNumber,
       name: name.trim(),
       amount: parseFloat(amount) || 0,
       receiver: receiver.trim(),
       mobile: mobile.trim(),
       paymentMode,
       status,
-      date: currentDate,
+      date, // ✅ store the existing or updated date
     };
 
     const db = getDatabase(app);
@@ -164,6 +187,8 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     } catch (error: any) {
       console.error('❌ Firebase Error:', error?.message ?? error);
       Alert.alert('Error', `Failed to save donation: ${error?.message ?? 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -175,10 +200,32 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
       return;
     }
 
-    const success = await printSampleReceipt(name, currentDate, amount, receiver, mobile, paymentMode, status);
-    if (success) {
-      navigation.navigate('Home');
+    setPrinting(true);
+    try {
+      const success = await printSampleReceipt(
+        name,
+        date, // ✅ Use correct stored date
+        amount,
+        receiver,
+        mobile,
+        paymentMode,
+        status,
+        serialNumber
+      );
+      if (success) {
+        navigation.navigate('Home');
+      }
+    } finally {
+      setPrinting(false);
     }
+  };
+
+  const handleEditClick = () => {
+    // ✅ Only update date when user clicks ✏️ to edit
+    const updatedDate = getCurrentDateTime();
+    setDate(updatedDate);
+    setIsEditing(true);
+    setShowPreview(false);
   };
 
   return (
@@ -186,6 +233,12 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
       <ScrollView contentContainerStyle={styles.container}>
         {isEditing && (
           <>
+            <Text style={styles.label}>Serial Number</Text>
+            <TextInput style={[styles.input, { backgroundColor: '#f2f2f2' }]} value={serialNumber} editable={false} />
+
+            <Text style={styles.label}>Date</Text>
+            <TextInput style={[styles.input, { backgroundColor: '#f2f2f2' }]} value={date} editable={false} />
+
             <Text style={styles.label}>Donor Name *</Text>
             <TextInput style={styles.input} value={name} onChangeText={setName} />
 
@@ -221,8 +274,12 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
               </Picker>
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleAddOrEdit}>
-              <Text style={styles.buttonText}>{isEditMode ? 'Save' : 'Add'}</Text>
+            <TouchableOpacity
+              style={[styles.button, loading && { backgroundColor: '#aaa' }]}
+              onPress={handleAddOrEdit}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>{loading ? 'Please wait...' : isEditMode ? 'Save' : 'Add'}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -232,44 +289,34 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.previewText}>=====================================</Text>
             <Text style={styles.previewCenter}>THE MAHARASHTRA AYYAPPA</Text>
             <Text style={styles.previewCenter}>SEVA SANGHAM (REGD.)</Text>
+            <Text style={styles.previewCenter}>Regd. No: MAH-373/Thane.</Text>
+            <Text style={styles.previewCenter}>Mohone</Text>
             <Text style={styles.previewText}>-------------------------------------</Text>
-            <Text style={styles.previewCenter}>Regd. No: MAH-373/Thane</Text>
-            <Text style={styles.previewCenter}>- Mohone</Text>
             <Text style={styles.previewCenter}>|| Swamiye Saranam Ayyappa ||</Text>
             <Text style={styles.previewText}>=====================================</Text>
 
-            <Text style={styles.previewLine}>Name     : {name}</Text>
-            <Text style={styles.previewLine}>Date     : {currentDate}</Text>
-            <Text style={styles.previewLine}>Amount   : Rs {amount}</Text>
-            <Text style={styles.previewLine}>Receiver : {receiver}</Text>
-            <Text style={styles.previewLine}>Payment  : {paymentMode}</Text>
-            <Text style={styles.previewLine}>Status   : {status}</Text>
+            <Text style={styles.previewLine}>Serial No : {serialNumber}</Text>
+            <Text style={styles.previewLine}>Name      : {name}</Text>
+            <Text style={styles.previewLine}>Date      : {date}</Text>
+            <Text style={styles.previewLine}>Amount    : Rs {amount}</Text>
+            <Text style={styles.previewLine}>Receiver  : {receiver}</Text>
+            <Text style={styles.previewLine}>Payment   : {paymentMode}</Text>
+            <Text style={styles.previewLine}>Status    : {status}</Text>
 
             <Text style={styles.previewText}>-------------------------------------</Text>
             <Text style={styles.previewCenter}>Thank you for your support!</Text>
             <Text style={styles.previewText}>=====================================</Text>
 
-            <TouchableOpacity style={styles.printButton} onPress={handlePrint}>
-              <Text style={styles.printButtonText}>🖨️ Print</Text>
+            <TouchableOpacity
+              style={[styles.printButton, printing && { backgroundColor: '#aaa' }]}
+              onPress={handlePrint}
+              disabled={printing}
+            >
+              <Text style={styles.printButtonText}>{printing ? 'Printing...' : '🖨️ Print'}</Text>
             </TouchableOpacity>
 
             {isEditMode && (
-              <TouchableOpacity
-                onPress={() => {
-                  setIsEditing(true);
-                  setShowPreview(false);
-                }}
-                style={{
-                  marginTop: 10,
-                  alignSelf: 'flex-end',
-                  backgroundColor: '#2196F3',
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
+              <TouchableOpacity onPress={handleEditClick} style={styles.editIcon}>
                 <Text style={{ color: '#fff', fontSize: 18 }}>✏️</Text>
               </TouchableOpacity>
             )}
@@ -277,12 +324,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
         )}
       </ScrollView>
 
-      <Text
-        style={[
-          styles.footer,
-          connectedInfo ? styles.connected : styles.disconnected,
-        ]}
-      >
+      <Text style={[styles.footer, connectedInfo ? styles.connected : styles.disconnected]}>
         {connectedInfo
           ? `🖨 Connected to: ${connectedInfo.name} (${connectedInfo.mac})`
           : '🔌 No printer connected'}
@@ -294,97 +336,31 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
 export default EmployeeForm;
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'space-between',
-  },
-  container: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  label: {
-    marginTop: 12,
-    marginBottom: 4,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
-    borderRadius: 6,
-    color: '#000',
-  },
-  pickerWrapper: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 52,
-    color: '#000',
-  },
-  button: {
-    backgroundColor: '#2196F3',
-    padding: 12,
-    borderRadius: 6,
-    marginVertical: 16,
-  },
-  buttonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  previewBox: {
-    backgroundColor: '#f5f5f5',
-    padding: 14,
-    borderRadius: 8,
+  wrapper: { flex: 1, backgroundColor: '#fff', justifyContent: 'space-between' },
+  container: { padding: 20, paddingBottom: 40 },
+  label: { marginTop: 12, marginBottom: 4, fontWeight: 'bold', color: '#333' },
+  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 6, color: '#000' },
+  pickerWrapper: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12, overflow: 'hidden' },
+  picker: { height: 52, color: '#000' },
+  button: { backgroundColor: '#2196F3', padding: 12, borderRadius: 6, marginVertical: 16 },
+  buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  previewBox: { backgroundColor: '#f5f5f5', padding: 14, borderRadius: 8, marginTop: 10 },
+  previewText: { fontSize: 14, color: '#000', textAlign: 'center', fontFamily: 'monospace' },
+  previewCenter: { textAlign: 'center', fontWeight: 'bold', fontSize: 15, color: '#000', fontFamily: 'monospace' },
+  previewLine: { fontSize: 15, color: '#000', fontFamily: 'monospace', marginVertical: 1 },
+  printButton: { marginTop: 12, backgroundColor: '#FF9800', padding: 10, borderRadius: 6 },
+  printButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  editIcon: {
     marginTop: 10,
+    alignSelf: 'flex-end',
+    backgroundColor: '#2196F3',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  previewText: {
-    fontSize: 14,
-    color: '#000',
-    textAlign: 'center',
-    fontFamily: 'monospace',
-  },
-  previewCenter: {
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: 15,
-    color: '#000',
-    fontFamily: 'monospace',
-  },
-  previewLine: {
-    fontSize: 15,
-    color: '#000',
-    fontFamily: 'monospace',
-    marginVertical: 1,
-  },
-  printButton: {
-    marginTop: 12,
-    backgroundColor: '#FF9800',
-    padding: 10,
-    borderRadius: 6,
-  },
-  printButtonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  footer: {
-    textAlign: 'center',
-    fontSize: 14,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderColor: '#ddd',
-  },
-  connected: {
-    color: 'green',
-  },
-  disconnected: {
-    color: 'red',
-  },
+  footer: { textAlign: 'center', fontSize: 14, padding: 12, backgroundColor: '#f9f9f9', borderColor: '#ddd' },
+  connected: { color: 'green' },
+  disconnected: { color: 'red' },
 });

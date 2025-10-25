@@ -47,6 +47,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 exports.__esModule = true;
+// src/screens/Home.tsx
 var react_1 = require("react");
 var react_native_1 = require("react-native");
 var native_1 = require("@react-navigation/native");
@@ -57,6 +58,9 @@ var database_1 = require("firebase/database");
 var dayjs_1 = require("dayjs");
 var customParseFormat_1 = require("dayjs/plugin/customParseFormat");
 var react_native_modal_datetime_picker_1 = require("react-native-modal-datetime-picker");
+var react_native_fs_1 = require("react-native-fs");
+var xlsx_1 = require("xlsx");
+var react_native_html_to_pdf_1 = require("react-native-html-to-pdf");
 dayjs_1["default"].extend(customParseFormat_1["default"]);
 var Home = function (_a) {
     var navigation = _a.navigation;
@@ -71,6 +75,9 @@ var Home = function (_a) {
     var _k = react_1.useState(false), filterModalVisible = _k[0], setFilterModalVisible = _k[1];
     var _l = react_1.useState(null), tempStartDate = _l[0], setTempStartDate = _l[1];
     var _m = react_1.useState(null), tempEndDate = _m[0], setTempEndDate = _m[1];
+    var _o = react_1.useState(false), downloadModalVisible = _o[0], setDownloadModalVisible = _o[1];
+    var _p = react_1.useState('xlsx'), downloadFormat = _p[0], setDownloadFormat = _p[1];
+    var _q = react_1.useState(true), loading = _q[0], setLoading = _q[1];
     var totalAmount = filteredRecords.reduce(function (sum, item) { return sum + parseFloat(item.amount); }, 0);
     react_1.useLayoutEffect(function () {
         navigation.setOptions({
@@ -125,7 +132,9 @@ var Home = function (_a) {
             var savedMac, savedName, err_1, db, snapshot, firebaseData, loadedRecords;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, async_storage_1["default"].getItem('printer_mac')];
+                    case 0:
+                        setLoading(true);
+                        return [4 /*yield*/, async_storage_1["default"].getItem('printer_mac')];
                     case 1:
                         savedMac = _a.sent();
                         return [4 /*yield*/, async_storage_1["default"].getItem('printer_name')];
@@ -147,7 +156,6 @@ var Home = function (_a) {
                         err_1 = _a.sent();
                         console.error('❌ Reconnect failed:', err_1);
                         setConnectedInfo(null);
-                        react_native_1.Alert.alert('Reconnect Failed', 'Could not reconnect to the saved printer.');
                         return [3 /*break*/, 7];
                     case 7: return [3 /*break*/, 9];
                     case 8:
@@ -171,6 +179,7 @@ var Home = function (_a) {
                         else {
                             setRecords([]);
                         }
+                        setLoading(false);
                         return [2 /*return*/];
                 }
             });
@@ -192,7 +201,8 @@ var Home = function (_a) {
             filtered = filtered.filter(function (item) {
                 return item.name.toLowerCase().includes(lowerText_1) ||
                     item.date.toLowerCase().includes(lowerText_1) ||
-                    item.status.toLowerCase().includes(lowerText_1);
+                    item.status.toLowerCase().includes(lowerText_1) ||
+                    (item.serialNumber && item.serialNumber.toString().toLowerCase().includes(lowerText_1));
             });
         }
         if (startDate && endDate) {
@@ -204,6 +214,56 @@ var Home = function (_a) {
         }
         setFilteredRecords(filtered);
     }, [searchQuery, startDate, endDate, records]);
+    var handleDownload = function () { return __awaiter(void 0, void 0, void 0, function () {
+        var ws, wb, wbout, now, dateTime, path, html, file, error_2;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    _a.trys.push([0, 5, , 6]);
+                    if (filteredRecords.length === 0) {
+                        react_native_1.Alert.alert('No Data', 'No records available to download.');
+                        return [2 /*return*/];
+                    }
+                    if (!(downloadFormat === 'xlsx')) return [3 /*break*/, 2];
+                    ws = xlsx_1["default"].utils.json_to_sheet(filteredRecords);
+                    wb = xlsx_1["default"].utils.book_new();
+                    xlsx_1["default"].utils.book_append_sheet(wb, ws, 'Donations');
+                    wbout = xlsx_1["default"].write(wb, { type: 'base64', bookType: 'xlsx' });
+                    now = new Date();
+                    dateTime = "" + now.getFullYear() + (now.getMonth() + 1).toString().padStart(2, '0') + now.getDate().toString().padStart(2, '0') + "_" + now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0') + now.getSeconds().toString().padStart(2, '0');
+                    path = react_native_fs_1["default"].DownloadDirectoryPath + "/donations_" + dateTime + ".xlsx";
+                    return [4 /*yield*/, react_native_fs_1["default"].writeFile(path, wbout, 'base64')];
+                case 1:
+                    _a.sent();
+                    react_native_1.Alert.alert('Success', "File saved to: " + path);
+                    return [3 /*break*/, 4];
+                case 2:
+                    html = "\n          <h2>Donation Records</h2>\n          <table border=\"1\" style=\"width:100%;border-collapse:collapse\">\n            <tr><th>Name</th><th>Date</th><th>Amount</th><th>Receiver</th></tr>\n            " + filteredRecords
+                        .map(function (item) {
+                        return "<tr><td>" + item.name + "</td><td>" + item.date + "</td><td>" + item.amount + "</td><td>" + item.receiver + "</td></tr>";
+                    })
+                        .join('') + "</table>";
+                    return [4 /*yield*/, react_native_html_to_pdf_1["default"].convert({
+                            html: html,
+                            fileName: 'donations',
+                            directory: 'Download'
+                        })];
+                case 3:
+                    file = _a.sent();
+                    react_native_1.Alert.alert('Success', "PDF saved to: " + file.filePath);
+                    _a.label = 4;
+                case 4:
+                    setDownloadModalVisible(false);
+                    return [3 /*break*/, 6];
+                case 5:
+                    error_2 = _a.sent();
+                    console.error(error_2);
+                    react_native_1.Alert.alert('Error', 'Download failed.');
+                    return [3 /*break*/, 6];
+                case 6: return [2 /*return*/];
+            }
+        });
+    }); };
     return (react_1["default"].createElement(react_native_1.View, { style: styles.container },
         react_1["default"].createElement(react_native_1.View, { style: styles.searchRow },
             react_1["default"].createElement(react_native_1.TextInput, { style: styles.searchInput, placeholder: "Search by Name, Date or Status", value: searchQuery, onChangeText: setSearchQuery }),
@@ -245,6 +305,8 @@ var Home = function (_a) {
         react_1["default"].createElement(react_native_1.View, { style: styles.card },
             react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('EmployeeForm'); }, style: styles.addButton },
                 react_1["default"].createElement(react_native_1.Text, { style: styles.addButtonText }, "+")),
+            react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return setDownloadModalVisible(true); }, style: [styles.addButton, { backgroundColor: '#4CAF50' }] },
+                react_1["default"].createElement(react_native_1.Text, { style: styles.downloadButtonText }, "\u2193")),
             react_1["default"].createElement(react_native_1.View, { style: styles.stat },
                 react_1["default"].createElement(react_native_1.Text, { style: styles.statValue }, filteredRecords.length),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.statLabel }, "Total Records")),
@@ -253,7 +315,11 @@ var Home = function (_a) {
                     "\u20B9 ",
                     totalAmount),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.statLabel }, "Total Amount"))),
-        react_1["default"].createElement(react_native_1.FlatList, { data: filteredRecords, keyExtractor: function (item) { return item.id; }, renderItem: function (_a) {
+        loading ? (react_1["default"].createElement(react_native_1.View, { style: { flex: 1, justifyContent: 'center', alignItems: 'center' } },
+            react_1["default"].createElement(react_native_1.ActivityIndicator, { size: "large", color: "#2196F3" }),
+            react_1["default"].createElement(react_native_1.Text, null, "Loading records..."))) : filteredRecords.length === 0 ? (react_1["default"].createElement(react_native_1.View, { style: { flex: 1, justifyContent: 'center', alignItems: 'center' } },
+            react_1["default"].createElement(react_native_1.Text, null, "No records found."))) : (react_1["default"].createElement(react_native_1.FlatList, { data: filteredRecords, keyExtractor: function (item) { return item.id; }, renderItem: function (_a) {
+                var _b;
                 var item = _a.item, index = _a.index;
                 return (react_1["default"].createElement(react_native_1.View, { style: styles.recordCardWrapper },
                     react_1["default"].createElement(react_native_1.TouchableOpacity, { style: styles.deleteIcon, onPress: function () { return handleDelete(item.id); } },
@@ -263,6 +329,8 @@ var Home = function (_a) {
                             react_1["default"].createElement(react_native_1.Text, { style: styles.indexText }, index + 1)),
                         react_1["default"].createElement(react_native_1.View, { style: styles.recordContent },
                             react_1["default"].createElement(react_native_1.Text, { style: styles.recordTitle }, item.name),
+                            react_1["default"].createElement(react_native_1.Text, { style: styles.recordBy },
+                                "Serial No: ", (_b = item.serialNumber) !== null && _b !== void 0 ? _b : '—'),
                             react_1["default"].createElement(react_native_1.Text, { style: styles.recordDate },
                                 "Date: ",
                                 item.date),
@@ -277,8 +345,10 @@ var Home = function (_a) {
                             item.amount,
                             "  "),
                         react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () {
+                                var _a;
                                 return navigation.navigate('EmployeeForm', {
                                     id: item.id,
+                                    serialNumber: (_a = item.serialNumber) !== null && _a !== void 0 ? _a : '',
                                     name: item.name,
                                     date: item.date,
                                     amount: item.amount.toString(),
@@ -290,46 +360,33 @@ var Home = function (_a) {
                                 });
                             } },
                             react_1["default"].createElement(react_native_1.Text, { style: { fontSize: 18 } }, "\uD83D\uDDA8")))));
-            } }),
+            } })),
         react_1["default"].createElement(react_native_1.Text, { style: [styles.footer, connectedInfo ? styles.connected : styles.disconnected] }, connectedInfo
             ? "\uD83D\uDDA8 Connected to: " + connectedInfo.name + " (" + connectedInfo.mac + ")"
-            : '🔌 No printer connected')));
+            : '🔌 No printer connected'),
+        react_1["default"].createElement(react_native_1.Modal, { visible: downloadModalVisible, transparent: true, animationType: "slide" },
+            react_1["default"].createElement(react_native_1.View, { style: styles.modalOverlay },
+                react_1["default"].createElement(react_native_1.View, { style: styles.modalContent },
+                    react_1["default"].createElement(react_native_1.Text, { style: styles.modalTitle }, "Select Download Format"),
+                    react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return setDownloadFormat('xlsx'); }, style: styles.radioRow },
+                        react_1["default"].createElement(react_native_1.Text, { style: styles.radioCircle }, downloadFormat === 'xlsx' ? '🔘' : '⚪'),
+                        react_1["default"].createElement(react_native_1.Text, { style: styles.radioLabel }, "Excel (.xlsx)")),
+                    react_1["default"].createElement(react_native_1.View, { style: styles.modalButtonRow },
+                        react_1["default"].createElement(react_native_1.TouchableOpacity, { style: styles.modalBtn, onPress: handleDownload },
+                            react_1["default"].createElement(react_native_1.Text, { style: { color: 'white' } }, "Download")),
+                        react_1["default"].createElement(react_native_1.TouchableOpacity, { style: [styles.modalBtn, { backgroundColor: '#ccc' }], onPress: function () { return setDownloadModalVisible(false); } },
+                            react_1["default"].createElement(react_native_1.Text, null, "Cancel"))))))));
 };
 exports["default"] = Home;
 var styles = react_native_1.StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 16,
-        backgroundColor: '#F5F5F5'
-    },
-    headerRightContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 10
-    },
-    iconButton: {
-        marginRight: 10,
-        padding: 5
-    },
-    iconText: {
-        fontSize: 18
-    },
-    connectedText: {
-        fontSize: 16,
-        color: 'green'
-    },
-    footer: {
-        textAlign: 'center',
-        fontSize: 14,
-        marginTop: 10,
-        marginBottom: 10
-    },
-    connected: {
-        color: 'green'
-    },
-    disconnected: {
-        color: 'red'
-    },
+    container: { flex: 1, padding: 16, backgroundColor: '#F5F5F5' },
+    headerRightContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+    iconButton: { marginRight: 10, padding: 5 },
+    iconText: { fontSize: 18 },
+    connectedText: { fontSize: 16, color: 'green' },
+    footer: { textAlign: 'center', fontSize: 14, marginTop: 10, marginBottom: 10 },
+    connected: { color: 'green' },
+    disconnected: { color: 'red' },
     card: {
         flexDirection: 'row',
         backgroundColor: '#fff',
@@ -339,23 +396,10 @@ var styles = react_native_1.StyleSheet.create({
         alignItems: 'center',
         elevation: 2
     },
-    stat: {
-        flex: 1,
-        alignItems: 'center'
-    },
-    statValue: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#2196F3'
-    },
-    statLabel: {
-        fontSize: 12,
-        color: '#888'
-    },
-    recordCardWrapper: {
-        position: 'relative',
-        marginBottom: 10
-    },
+    stat: { flex: 1, alignItems: 'center' },
+    statValue: { fontSize: 20, fontWeight: 'bold', color: '#2196F3' },
+    statLabel: { fontSize: 12, color: '#888' },
+    recordCardWrapper: { position: 'relative', marginBottom: 10 },
     recordCard: {
         backgroundColor: '#fff',
         borderRadius: 10,
@@ -373,45 +417,23 @@ var styles = react_native_1.StyleSheet.create({
         alignItems: 'center',
         marginRight: 10
     },
-    indexText: {
-        color: '#fff',
-        fontWeight: 'bold'
-    },
-    recordContent: {
-        flex: 1
-    },
-    recordTitle: {
-        fontWeight: 'bold',
-        fontSize: 16
-    },
-    recordDate: {
-        fontSize: 12,
-        color: '#555'
-    },
-    recordBy: {
-        fontSize: 12,
-        color: '#999'
-    },
-    amountText: {
-        fontWeight: 'bold',
-        color: 'green',
-        fontSize: 14,
-        paddingHorizontal: 4
-    },
+    indexText: { color: '#fff', fontWeight: 'bold' },
+    recordContent: { flex: 1 },
+    recordTitle: { fontWeight: 'bold', fontSize: 16 },
+    recordDate: { fontSize: 12, color: '#555' },
+    recordBy: { fontSize: 12, color: '#999' },
+    amountText: { fontWeight: 'bold', color: 'green', fontSize: 14, paddingHorizontal: 4 },
     addButton: {
-        width: 50,
-        height: 50,
+        width: 40,
+        height: 40,
         borderRadius: 25,
         backgroundColor: '#2196F3',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12
+        marginRight: 8
     },
-    addButtonText: {
-        fontSize: 30,
-        color: '#fff',
-        lineHeight: 30
-    },
+    addButtonText: { fontSize: 30, color: '#fff', lineHeight: 30 },
+    downloadButtonText: { fontSize: 30, color: '#fff', lineHeight: 35, marginTop: -5 },
     deleteIcon: {
         position: 'absolute',
         top: 6,
@@ -421,11 +443,7 @@ var styles = react_native_1.StyleSheet.create({
         borderRadius: 14,
         padding: 4
     },
-    searchRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 10
-    },
+    searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     searchInput: {
         flex: 1,
         backgroundColor: '#fff',
@@ -457,17 +475,8 @@ var styles = react_native_1.StyleSheet.create({
         borderRadius: 10,
         elevation: 5
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 12,
-        textAlign: 'center'
-    },
-    modalButtonRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20
-    },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+    modalButtonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
     modalBtn: {
         flex: 1,
         padding: 12,
@@ -494,5 +503,8 @@ var styles = react_native_1.StyleSheet.create({
     dateText: {
         fontSize: 16,
         color: '#000'
-    }
+    },
+    radioRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    radioCircle: { fontSize: 22, marginRight: 8 },
+    radioLabel: { fontSize: 16 }
 });

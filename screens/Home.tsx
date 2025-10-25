@@ -1,3 +1,4 @@
+// src/screens/Home.tsx
 import React, { useLayoutEffect, useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -8,6 +9,7 @@ import {
   FlatList,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,7 +21,9 @@ import { getDatabase, ref, get, remove } from 'firebase/database';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-
+import RNFS from 'react-native-fs';
+import XLSX from 'xlsx';
+import RNHTMLtoPDF from 'react-native-html-to-pdf';
 
 dayjs.extend(customParseFormat);
 
@@ -37,6 +41,9 @@ const Home = ({ navigation }: Props) => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
   const [tempEndDate, setTempEndDate] = useState<Date | null>(null);
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
+  const [downloadFormat, setDownloadFormat] = useState<'xlsx' | 'pdf'>('xlsx');
+  const [loading, setLoading] = useState(true);
 
   const totalAmount = filteredRecords.reduce((sum, item) => sum + parseFloat(item.amount), 0);
 
@@ -85,6 +92,8 @@ const Home = ({ navigation }: Props) => {
   useFocusEffect(
     useCallback(() => {
       const init = async () => {
+        setLoading(true);
+
         const savedMac = await AsyncStorage.getItem('printer_mac');
         const savedName = await AsyncStorage.getItem('printer_name');
         if (savedMac) {
@@ -95,7 +104,6 @@ const Home = ({ navigation }: Props) => {
           } catch (err) {
             console.error('❌ Reconnect failed:', err);
             setConnectedInfo(null);
-            Alert.alert('Reconnect Failed', 'Could not reconnect to the saved printer.');
           }
         } else {
           setConnectedInfo(null);
@@ -118,11 +126,14 @@ const Home = ({ navigation }: Props) => {
         } else {
           setRecords([]);
         }
+
+        setLoading(false);
       };
 
       init();
     }, [])
   );
+
   const clearFilters = () => {
   // setSearchQuery('');
   setStartDate(null);
@@ -141,7 +152,8 @@ const Home = ({ navigation }: Props) => {
         (item) =>
           item.name.toLowerCase().includes(lowerText) ||
           item.date.toLowerCase().includes(lowerText) ||
-          item.status.toLowerCase().includes(lowerText)
+          item.status.toLowerCase().includes(lowerText) ||
+          (item.serialNumber && item.serialNumber.toString().toLowerCase().includes(lowerText))
       );
     }
 
@@ -158,8 +170,52 @@ const Home = ({ navigation }: Props) => {
     setFilteredRecords(filtered);
   }, [searchQuery, startDate, endDate, records]);
 
+  const handleDownload = async () => {
+    try {
+      if (filteredRecords.length === 0) {
+        Alert.alert('No Data', 'No records available to download.');
+        return;
+      }
+
+      if (downloadFormat === 'xlsx') {
+        const ws = XLSX.utils.json_to_sheet(filteredRecords);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Donations');
+        const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+        const now = new Date();
+        const dateTime = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
+        const path = `${RNFS.DownloadDirectoryPath}/donations_${dateTime}.xlsx`;
+        await RNFS.writeFile(path, wbout, 'base64');
+        Alert.alert('Success', `File saved to: ${path}`);
+      } else {
+        const html = `
+          <h2>Donation Records</h2>
+          <table border="1" style="width:100%;border-collapse:collapse">
+            <tr><th>Name</th><th>Date</th><th>Amount</th><th>Receiver</th></tr>
+            ${filteredRecords
+              .map(
+                (item) =>
+                  `<tr><td>${item.name}</td><td>${item.date}</td><td>${item.amount}</td><td>${item.receiver}</td></tr>`
+              )
+              .join('')}</table>`;
+        const file = await RNHTMLtoPDF.convert({
+          html,
+          fileName: 'donations',
+          directory: 'Download',
+        });
+        Alert.alert('Success', `PDF saved to: ${file.filePath}`);
+      }
+
+      setDownloadModalVisible(false);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Download failed.');
+    }
+  };
+
   return (
     <View style={styles.container}>
+      {/* Search Row */}
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
@@ -239,10 +295,18 @@ const Home = ({ navigation }: Props) => {
         />
       </Modal>
 
+      {/* Add / Download / Stats */}
       <View style={styles.card}>
         <TouchableOpacity onPress={() => navigation.navigate('EmployeeForm')} style={styles.addButton}>
           <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setDownloadModalVisible(true)}
+          style={[styles.addButton, { backgroundColor: '#4CAF50' }]}
+        >
+          <Text style={styles.downloadButtonText}>↓</Text>
+        </TouchableOpacity>
+
         <View style={styles.stat}>
           <Text style={styles.statValue}>{filteredRecords.length}</Text>
           <Text style={styles.statLabel}>Total Records</Text>
@@ -253,56 +317,102 @@ const Home = ({ navigation }: Props) => {
         </View>
       </View>
 
-      <FlatList
-        data={filteredRecords}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <View style={styles.recordCardWrapper}>
-            <TouchableOpacity style={styles.deleteIcon} onPress={() => handleDelete(item.id)}>
-              <Text style={{ fontSize: 18, color: 'red' }}>🗑</Text>
-            </TouchableOpacity>
+      {/* Loading / No Records / List */}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#2196F3" />
+          <Text>Loading records...</Text>
+        </View>
+      ) : filteredRecords.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>No records found.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredRecords}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
+            <View style={styles.recordCardWrapper}>
+              <TouchableOpacity style={styles.deleteIcon} onPress={() => handleDelete(item.id)}>
+                <Text style={{ fontSize: 18, color: 'red' }}>🗑</Text>
+              </TouchableOpacity>
 
-            <View style={styles.recordCard}>
-              <View style={styles.indexCircle}>
-                <Text style={styles.indexText}>{index + 1}</Text>
-              </View>
+              <View style={styles.recordCard}>
+                <View style={styles.indexCircle}>
+                  <Text style={styles.indexText}>{index + 1}</Text>
+                </View>
 
-              <View style={styles.recordContent}>
-                <Text style={styles.recordTitle}>{item.name}</Text>
-                <Text style={styles.recordDate}>Date: {item.date}</Text>
-                <Text style={styles.recordBy}>Received: {item.receiver}</Text>
-                <Text style={styles.recordBy}>Status: {item.status}</Text>
-              </View>
+                <View style={styles.recordContent}>
+                  <Text style={styles.recordTitle}>{item.name}</Text>
+                  <Text style={styles.recordBy}>Serial No: {item.serialNumber ?? '—'}</Text>
+                  <Text style={styles.recordDate}>Date: {item.date}</Text>
+                  <Text style={styles.recordBy}>Received: {item.receiver}</Text>
+                  <Text style={styles.recordBy}>Status: {item.status}</Text>
+                </View>
 
               <Text style={styles.amountText}>₹ {item.amount}  </Text>
 
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate('EmployeeForm', {
-                    id: item.id,
-                    name: item.name,
-                    date: item.date,
-                    amount: item.amount.toString(),
-                    receiver: item.receiver,
-                    mobile: item.mobile,
-                    paymentMode: item.paymentMode,
-                    status: item.status,
-                    mode: 'edit',
-                  })
-                }
-              >
-                <Text style={{ fontSize: 18 }}>🖨</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('EmployeeForm', {
+                      id: item.id,
+                      serialNumber: item.serialNumber ?? '',
+                      name: item.name,
+                      date: item.date,
+                      amount: item.amount.toString(),
+                      receiver: item.receiver,
+                      mobile: item.mobile,
+                      paymentMode: item.paymentMode,
+                      status: item.status,
+                      mode: 'edit',
+                    })
+                  }
+                >
+                  <Text style={{ fontSize: 18 }}>🖨</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        )}
-      />
+          )}
+        />
+      )}
 
+      {/* Footer */}
       <Text style={[styles.footer, connectedInfo ? styles.connected : styles.disconnected]}>
         {connectedInfo
           ? `🖨 Connected to: ${connectedInfo.name} (${connectedInfo.mac})`
           : '🔌 No printer connected'}
       </Text>
+
+      {/* Download Modal */}
+      <Modal visible={downloadModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Download Format</Text>
+
+            <TouchableOpacity onPress={() => setDownloadFormat('xlsx')} style={styles.radioRow}>
+              <Text style={styles.radioCircle}>{downloadFormat === 'xlsx' ? '🔘' : '⚪'}</Text>
+              <Text style={styles.radioLabel}>Excel (.xlsx)</Text>
+            </TouchableOpacity>
+
+            {/* <TouchableOpacity onPress={() => setDownloadFormat('pdf')} style={styles.radioRow}>
+              <Text style={styles.radioCircle}>{downloadFormat === 'pdf' ? '🔘' : '⚪'}</Text>
+              <Text style={styles.radioLabel}>PDF (.pdf)</Text>
+            </TouchableOpacity> */}
+
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity style={styles.modalBtn} onPress={handleDownload}>
+                <Text style={{ color: 'white' }}>Download</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: '#ccc' }]}
+                onPress={() => setDownloadModalVisible(false)}
+              >
+                <Text>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -310,39 +420,14 @@ const Home = ({ navigation }: Props) => {
 export default Home;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#F5F5F5',
-  },
-  headerRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  iconButton: {
-    marginRight: 10,
-    padding: 5,
-  },
-  iconText: {
-    fontSize: 18,
-  },
-  connectedText: {
-    fontSize: 16,
-    color: 'green',
-  },
-  footer: {
-    textAlign: 'center',
-    fontSize: 14,
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  connected: {
-    color: 'green',
-  },
-  disconnected: {
-    color: 'red',
-  },
+  container: { flex: 1, padding: 16, backgroundColor: '#F5F5F5' },
+  headerRightContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 10 },
+  iconButton: { marginRight: 10, padding: 5 },
+  iconText: { fontSize: 18 },
+  connectedText: { fontSize: 16, color: 'green' },
+  footer: { textAlign: 'center', fontSize: 14, marginTop: 10, marginBottom: 10 },
+  connected: { color: 'green' },
+  disconnected: { color: 'red' },
   card: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -352,23 +437,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 2,
   },
-  stat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
-  recordCardWrapper: {
-    position: 'relative',
-    marginBottom: 10,
-  },
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 20, fontWeight: 'bold', color: '#2196F3' },
+  statLabel: { fontSize: 12, color: '#888' },
+  recordCardWrapper: { position: 'relative', marginBottom: 10 },
   recordCard: {
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -386,45 +458,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  indexText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  recordContent: {
-    flex: 1,
-  },
-  recordTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  recordDate: {
-    fontSize: 12,
-    color: '#555',
-  },
-  recordBy: {
-    fontSize: 12,
-    color: '#999',
-  },
-  amountText: {
-    fontWeight: 'bold',
-    color: 'green',
-    fontSize: 14,
-    paddingHorizontal: 4,
-  },
+  indexText: { color: '#fff', fontWeight: 'bold' },
+  recordContent: { flex: 1 },
+  recordTitle: { fontWeight: 'bold', fontSize: 16 },
+  recordDate: { fontSize: 12, color: '#555' },
+  recordBy: { fontSize: 12, color: '#999' },
+  amountText: { fontWeight: 'bold', color: 'green', fontSize: 14, paddingHorizontal: 4 },
   addButton: {
-    width: 50,
-    height: 50,
+    width: 40,
+    height: 40,
     borderRadius: 25,
     backgroundColor: '#2196F3',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
-  addButtonText: {
-    fontSize: 30,
-    color: '#fff',
-    lineHeight: 30,
-  },
+  addButtonText: { fontSize: 30, color: '#fff', lineHeight: 30 },
+  downloadButtonText: { fontSize: 30, color: '#fff', lineHeight: 35, marginTop: -5 },
   deleteIcon: {
     position: 'absolute',
     top: 6,
@@ -434,11 +484,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 4,
   },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
+  searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   searchInput: {
     flex: 1,
     backgroundColor: '#fff',
@@ -470,17 +516,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 5,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  modalButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+  modalButtonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   modalBtn: {
     flex: 1,
     padding: 12,
@@ -508,4 +545,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000',
   },
+  radioRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  radioCircle: { fontSize: 22, marginRight: 8 },
+  radioLabel: { fontSize: 16 },
 });
+

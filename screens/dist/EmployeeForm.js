@@ -48,17 +48,38 @@ var firebaseConfig_1 = require("./firebaseConfig");
 var uuid_1 = require("uuid");
 var EmployeeForm = function (_a) {
     var route = _a.route, navigation = _a.navigation;
-    var _b = route.params || {}, _c = _b.id, id = _c === void 0 ? '' : _c, _d = _b.name, initialName = _d === void 0 ? '' : _d, _e = _b.amount, initialAmount = _e === void 0 ? '' : _e, _f = _b.receiver, initialReceiver = _f === void 0 ? '' : _f, _g = _b.mobile, initialMobile = _g === void 0 ? '' : _g, _h = _b.paymentMode, initialPaymentMode = _h === void 0 ? 'Cash' : _h, _j = _b.status, initialStatus = _j === void 0 ? 'Pending' : _j, date = _b.date, _k = _b.mode, mode = _k === void 0 ? 'add' : _k;
+    var _b = route.params || {}, _c = _b.id, id = _c === void 0 ? '' : _c, _d = _b.serialNumber, initialSerialNumber = _d === void 0 ? '' : _d, _e = _b.name, initialName = _e === void 0 ? '' : _e, _f = _b.amount, initialAmount = _f === void 0 ? '' : _f, _g = _b.receiver, initialReceiver = _g === void 0 ? '' : _g, _h = _b.mobile, initialMobile = _h === void 0 ? '' : _h, _j = _b.paymentMode, initialPaymentMode = _j === void 0 ? 'Cash' : _j, _k = _b.status, initialStatus = _k === void 0 ? 'Pending' : _k, _l = _b.date, initialDate = _l === void 0 ? '' : _l, // ✅ incoming date from Home
+    _m = _b.mode, // ✅ incoming date from Home
+    mode = _m === void 0 ? 'add' : _m;
     var isEditMode = mode === 'edit';
-    var _l = react_1.useState(initialName), name = _l[0], setName = _l[1];
-    var _m = react_1.useState(initialAmount ? String(initialAmount) : ''), amount = _m[0], setAmount = _m[1];
-    var _o = react_1.useState(initialReceiver), receiver = _o[0], setReceiver = _o[1];
-    var _p = react_1.useState(initialMobile), mobile = _p[0], setMobile = _p[1];
-    var _q = react_1.useState(initialPaymentMode), paymentMode = _q[0], setPaymentMode = _q[1];
-    var _r = react_1.useState(initialStatus), status = _r[0], setStatus = _r[1];
-    var _s = react_1.useState(isEditMode), showPreview = _s[0], setShowPreview = _s[1];
-    var _t = react_1.useState(!isEditMode), isEditing = _t[0], setIsEditing = _t[1];
-    var _u = react_1.useState(null), connectedInfo = _u[0], setConnectedInfo = _u[1];
+    var _o = react_1.useState(initialName), name = _o[0], setName = _o[1];
+    var _p = react_1.useState(initialSerialNumber || ''), serialNumber = _p[0], setSerialNumber = _p[1];
+    var _q = react_1.useState(initialAmount ? String(initialAmount) : ''), amount = _q[0], setAmount = _q[1];
+    var _r = react_1.useState(initialReceiver), receiver = _r[0], setReceiver = _r[1];
+    var _s = react_1.useState(initialMobile), mobile = _s[0], setMobile = _s[1];
+    var _t = react_1.useState(initialPaymentMode), paymentMode = _t[0], setPaymentMode = _t[1];
+    var _u = react_1.useState(initialStatus), status = _u[0], setStatus = _u[1];
+    var _v = react_1.useState(isEditMode), showPreview = _v[0], setShowPreview = _v[1];
+    var _w = react_1.useState(!isEditMode), isEditing = _w[0], setIsEditing = _w[1];
+    var _x = react_1.useState(null), connectedInfo = _x[0], setConnectedInfo = _x[1];
+    var _y = react_1.useState(false), loading = _y[0], setLoading = _y[1];
+    var _z = react_1.useState(false), printing = _z[0], setPrinting = _z[1];
+    var _0 = react_1.useState(initialDate || ''), date = _0[0], setDate = _0[1]; // ✅ Store the correct date
+    // ✅ Generate unique serial number with date
+    var generateSerialNumber = function () {
+        var now = new Date();
+        var datePart = "" + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+        var randomPart = Math.floor(1000 + Math.random() * 9000); // random 4-digit
+        return "SN-" + datePart + "-" + randomPart;
+    };
+    react_1.useEffect(function () {
+        if (!isEditMode && !serialNumber) {
+            var newSN = generateSerialNumber();
+            setSerialNumber(newSN);
+            var now = new Date();
+            setDate(getCurrentDateTime());
+        }
+    }, [isEditMode, serialNumber, date]);
     native_1.useFocusEffect(react_1.useCallback(function () {
         var reconnectPrinter = function () { return __awaiter(void 0, void 0, void 0, function () {
             var savedMac, savedName, err_1;
@@ -103,14 +124,9 @@ var EmployeeForm = function (_a) {
     react_1.useLayoutEffect(function () {
         navigation.setOptions({
             title: 'Donation',
-            headerStyle: {
-                backgroundColor: '#2196F3'
-            },
+            headerStyle: { backgroundColor: '#2196F3' },
             headerTintColor: '#fff',
-            headerTitleStyle: {
-                fontWeight: 'bold'
-            },
-            // eslint-disable-next-line react/no-unstable-nested-components
+            headerTitleStyle: { fontWeight: 'bold' },
             headerRight: function () {
                 return connectedInfo ? (react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('Setting'); }, style: { marginRight: 10 } },
                     react_1["default"].createElement(react_native_1.Text, { style: { fontSize: 16, color: 'green' } }, "\uD83D\uDFE2 Printer"))) : (react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { return navigation.navigate('Setting'); }, style: { marginRight: 10 } },
@@ -129,7 +145,7 @@ var EmployeeForm = function (_a) {
         var formattedHours = String(hours).padStart(2, '0');
         return day + "-" + month + "-" + year + " " + formattedHours + ":" + minutes + " " + ampm;
     };
-    var currentDate = date ? formatDate(new Date()) : formatDate(new Date());
+    var getCurrentDateTime = function () { return formatDate(new Date()); };
     var validateFields = function () {
         if (!name.trim() || !amount.trim() || !receiver.trim()) {
             react_native_1.Alert.alert('Validation Error', 'Name, Amount and Receiver are required.');
@@ -149,19 +165,21 @@ var EmployeeForm = function (_a) {
                 case 0:
                     if (!validateFields())
                         return [2 /*return*/];
+                    setLoading(true);
                     formData = {
+                        serialNumber: serialNumber,
                         name: name.trim(),
                         amount: parseFloat(amount) || 0,
                         receiver: receiver.trim(),
                         mobile: mobile.trim(),
                         paymentMode: paymentMode,
                         status: status,
-                        date: currentDate
+                        date: date
                     };
                     db = database_1.getDatabase(firebaseConfig_1["default"]);
                     _c.label = 1;
                 case 1:
-                    _c.trys.push([1, 6, , 7]);
+                    _c.trys.push([1, 6, 7, 8]);
                     if (!(isEditMode && id)) return [3 /*break*/, 3];
                     donationRef = database_1.ref(db, "/donations/" + id);
                     return [4 /*yield*/, database_1.update(donationRef, formData)];
@@ -187,13 +205,16 @@ var EmployeeForm = function (_a) {
                 case 5:
                     setIsEditing(false);
                     setShowPreview(true);
-                    return [3 /*break*/, 7];
+                    return [3 /*break*/, 8];
                 case 6:
                     error_1 = _c.sent();
                     console.error('❌ Firebase Error:', (_a = error_1 === null || error_1 === void 0 ? void 0 : error_1.message) !== null && _a !== void 0 ? _a : error_1);
                     react_native_1.Alert.alert('Error', "Failed to save donation: " + ((_b = error_1 === null || error_1 === void 0 ? void 0 : error_1.message) !== null && _b !== void 0 ? _b : 'Unknown error'));
-                    return [3 /*break*/, 7];
-                case 7: return [2 /*return*/];
+                    return [3 /*break*/, 8];
+                case 7:
+                    setLoading(false);
+                    return [7 /*endfinally*/];
+                case 8: return [2 /*return*/];
             }
         });
     }); };
@@ -208,19 +229,39 @@ var EmployeeForm = function (_a) {
                         react_native_1.Alert.alert('Printer Error', 'Printer not connected!');
                         return [2 /*return*/];
                     }
-                    return [4 /*yield*/, Printer_1.printSampleReceipt(name, currentDate, amount, receiver, mobile, paymentMode, status)];
+                    setPrinting(true);
+                    _a.label = 1;
                 case 1:
+                    _a.trys.push([1, , 3, 4]);
+                    return [4 /*yield*/, Printer_1.printSampleReceipt(name, date, // ✅ Use correct stored date
+                        amount, receiver, mobile, paymentMode, status, serialNumber)];
+                case 2:
                     success = _a.sent();
                     if (success) {
                         navigation.navigate('Home');
                     }
-                    return [2 /*return*/];
+                    return [3 /*break*/, 4];
+                case 3:
+                    setPrinting(false);
+                    return [7 /*endfinally*/];
+                case 4: return [2 /*return*/];
             }
         });
     }); };
+    var handleEditClick = function () {
+        // ✅ Only update date when user clicks ✏️ to edit
+        var updatedDate = getCurrentDateTime();
+        setDate(updatedDate);
+        setIsEditing(true);
+        setShowPreview(false);
+    };
     return (react_1["default"].createElement(react_native_1.View, { style: styles.wrapper },
         react_1["default"].createElement(react_native_1.ScrollView, { contentContainerStyle: styles.container },
             isEditing && (react_1["default"].createElement(react_1["default"].Fragment, null,
+                react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "Serial Number"),
+                react_1["default"].createElement(react_native_1.TextInput, { style: [styles.input, { backgroundColor: '#f2f2f2' }], value: serialNumber, editable: false }),
+                react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "Date"),
+                react_1["default"].createElement(react_native_1.TextInput, { style: [styles.input, { backgroundColor: '#f2f2f2' }], value: date, editable: false }),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "Donor Name *"),
                 react_1["default"].createElement(react_native_1.TextInput, { style: styles.input, value: name, onChangeText: setName }),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.label }, "Donation Amount *"),
@@ -240,154 +281,76 @@ var EmployeeForm = function (_a) {
                     react_1["default"].createElement(picker_1.Picker, { selectedValue: status, onValueChange: setStatus, style: styles.picker },
                         react_1["default"].createElement(picker_1.Picker.Item, { label: "Pending", value: "Pending" }),
                         react_1["default"].createElement(picker_1.Picker.Item, { label: "Paid", value: "Paid" }))),
-                react_1["default"].createElement(react_native_1.TouchableOpacity, { style: styles.button, onPress: handleAddOrEdit },
-                    react_1["default"].createElement(react_native_1.Text, { style: styles.buttonText }, isEditMode ? 'Save' : 'Add')))),
+                react_1["default"].createElement(react_native_1.TouchableOpacity, { style: [styles.button, loading && { backgroundColor: '#aaa' }], onPress: handleAddOrEdit, disabled: loading },
+                    react_1["default"].createElement(react_native_1.Text, { style: styles.buttonText }, loading ? 'Please wait...' : isEditMode ? 'Save' : 'Add')))),
             !isEditing && showPreview && (react_1["default"].createElement(react_native_1.View, { style: styles.previewBox },
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewText }, "====================================="),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "THE MAHARASHTRA AYYAPPA"),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "SEVA SANGHAM (REGD.)"),
+                react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "Regd. No: MAH-373/Thane."),
+                react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "Mohone"),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewText }, "-------------------------------------"),
-                react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "Regd. No: MAH-373/Thane"),
-                react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "- Mohone"),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "|| Swamiye Saranam Ayyappa ||"),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewText }, "====================================="),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
-                    "Name     : ",
+                    "Serial No : ",
+                    serialNumber),
+                react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
+                    "Name      : ",
                     name),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
-                    "Date     : ",
-                    currentDate),
+                    "Date      : ",
+                    date),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
-                    "Amount   : Rs ",
+                    "Amount    : Rs ",
                     amount),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
-                    "Receiver : ",
+                    "Receiver  : ",
                     receiver),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
-                    "Payment  : ",
+                    "Payment   : ",
                     paymentMode),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewLine },
-                    "Status   : ",
+                    "Status    : ",
                     status),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewText }, "-------------------------------------"),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewCenter }, "Thank you for your support!"),
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewText }, "====================================="),
-                react_1["default"].createElement(react_native_1.TouchableOpacity, { style: styles.printButton, onPress: handlePrint },
-                    react_1["default"].createElement(react_native_1.Text, { style: styles.printButtonText }, "\uD83D\uDDA8\uFE0F Print")),
-                isEditMode && (react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () {
-                        setIsEditing(true);
-                        setShowPreview(false);
-                    }, style: {
-                        marginTop: 10,
-                        alignSelf: 'flex-end',
-                        backgroundColor: '#2196F3',
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                    } },
+                react_1["default"].createElement(react_native_1.TouchableOpacity, { style: [styles.printButton, printing && { backgroundColor: '#aaa' }], onPress: handlePrint, disabled: printing },
+                    react_1["default"].createElement(react_native_1.Text, { style: styles.printButtonText }, printing ? 'Printing...' : '🖨️ Print')),
+                isEditMode && (react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: handleEditClick, style: styles.editIcon },
                     react_1["default"].createElement(react_native_1.Text, { style: { color: '#fff', fontSize: 18 } }, "\u270F\uFE0F")))))),
-        react_1["default"].createElement(react_native_1.Text, { style: [
-                styles.footer,
-                connectedInfo ? styles.connected : styles.disconnected,
-            ] }, connectedInfo
+        react_1["default"].createElement(react_native_1.Text, { style: [styles.footer, connectedInfo ? styles.connected : styles.disconnected] }, connectedInfo
             ? "\uD83D\uDDA8 Connected to: " + connectedInfo.name + " (" + connectedInfo.mac + ")"
             : '🔌 No printer connected')));
 };
 exports["default"] = EmployeeForm;
 var styles = react_native_1.StyleSheet.create({
-    wrapper: {
-        flex: 1,
-        backgroundColor: '#fff',
-        justifyContent: 'space-between'
-    },
-    container: {
-        padding: 20,
-        paddingBottom: 40
-    },
-    label: {
-        marginTop: 12,
-        marginBottom: 4,
-        fontWeight: 'bold',
-        color: '#333'
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        padding: 10,
-        borderRadius: 6,
-        color: '#000'
-    },
-    pickerWrapper: {
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 6,
-        marginBottom: 12,
-        overflow: 'hidden'
-    },
-    picker: {
-        height: 52,
-        color: '#000'
-    },
-    button: {
+    wrapper: { flex: 1, backgroundColor: '#fff', justifyContent: 'space-between' },
+    container: { padding: 20, paddingBottom: 40 },
+    label: { marginTop: 12, marginBottom: 4, fontWeight: 'bold', color: '#333' },
+    input: { borderWidth: 1, borderColor: '#ccc', padding: 10, borderRadius: 6, color: '#000' },
+    pickerWrapper: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12, overflow: 'hidden' },
+    picker: { height: 52, color: '#000' },
+    button: { backgroundColor: '#2196F3', padding: 12, borderRadius: 6, marginVertical: 16 },
+    buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+    previewBox: { backgroundColor: '#f5f5f5', padding: 14, borderRadius: 8, marginTop: 10 },
+    previewText: { fontSize: 14, color: '#000', textAlign: 'center', fontFamily: 'monospace' },
+    previewCenter: { textAlign: 'center', fontWeight: 'bold', fontSize: 15, color: '#000', fontFamily: 'monospace' },
+    previewLine: { fontSize: 15, color: '#000', fontFamily: 'monospace', marginVertical: 1 },
+    printButton: { marginTop: 12, backgroundColor: '#FF9800', padding: 10, borderRadius: 6 },
+    printButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+    editIcon: {
+        marginTop: 10,
+        alignSelf: 'flex-end',
         backgroundColor: '#2196F3',
-        padding: 12,
-        borderRadius: 6,
-        marginVertical: 16
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center'
     },
-    buttonText: {
-        color: '#fff',
-        textAlign: 'center',
-        fontWeight: 'bold'
-    },
-    previewBox: {
-        backgroundColor: '#f5f5f5',
-        padding: 14,
-        borderRadius: 8,
-        marginTop: 10
-    },
-    previewText: {
-        fontSize: 14,
-        color: '#000',
-        textAlign: 'center',
-        fontFamily: 'monospace'
-    },
-    previewCenter: {
-        textAlign: 'center',
-        fontWeight: 'bold',
-        fontSize: 15,
-        color: '#000',
-        fontFamily: 'monospace'
-    },
-    previewLine: {
-        fontSize: 15,
-        color: '#000',
-        fontFamily: 'monospace',
-        marginVertical: 1
-    },
-    printButton: {
-        marginTop: 12,
-        backgroundColor: '#FF9800',
-        padding: 10,
-        borderRadius: 6
-    },
-    printButtonText: {
-        color: '#fff',
-        textAlign: 'center',
-        fontWeight: 'bold'
-    },
-    footer: {
-        textAlign: 'center',
-        fontSize: 14,
-        padding: 12,
-        backgroundColor: '#f9f9f9',
-        borderColor: '#ddd'
-    },
-    connected: {
-        color: 'green'
-    },
-    disconnected: {
-        color: 'red'
-    }
+    footer: { textAlign: 'center', fontSize: 14, padding: 12, backgroundColor: '#f9f9f9', borderColor: '#ddd' },
+    connected: { color: 'green' },
+    disconnected: { color: 'red' }
 });

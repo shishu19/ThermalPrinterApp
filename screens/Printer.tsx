@@ -9,26 +9,28 @@ export const printSampleReceipt = async (
   receiver: string,
   mobile: string,
   paymentMode: string,
-  status: string
+  status: string,
+  serialNumber?: string // ✅ Added serial number parameter
 ): Promise<boolean> => {
 
-const printText = `
+  const printText = `
 ================================
     THE MAHARASHTRA AYYAPPA 
       SEVA SANGHAM (REGD.) 
---------------------------------
     Regd. No: MAH-373/Thane    
-         - Mohone            
-  || Swamiye Saranam Ayyappa ||
-================================
-Name     : ${name}
-Date     : ${date}
-Amount   : Rs ${amount}
-Receiver : ${receiver}
-Payment  : ${paymentMode}
-Status   : ${status}
+           Mohone          
 --------------------------------
-   Thank you for your support!
+ || Swamiye Saranam Ayyappa ||
+================================
+Serial No  : ${serialNumber ?? 'N/A'}
+Name       : ${name}
+Date       : ${date}
+Amount     : Rs ${amount}
+Receiver   : ${receiver}
+Payment    : ${paymentMode}
+Status     : ${status}
+--------------------------------
+  Thank you for your support!
 ================================
 `;
 

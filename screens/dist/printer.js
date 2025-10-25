@@ -40,12 +40,13 @@ exports.printSampleReceipt = void 0;
 // printer.tsx
 var react_native_1 = require("react-native");
 var react_native_thermal_receipt_printer_1 = require("react-native-thermal-receipt-printer");
-exports.printSampleReceipt = function (name, date, amount, receiver, mobile, paymentMode, status) { return __awaiter(void 0, void 0, Promise, function () {
+exports.printSampleReceipt = function (name, date, amount, receiver, mobile, paymentMode, status, serialNumber // ✅ Added serial number parameter
+) { return __awaiter(void 0, void 0, Promise, function () {
     var printText, err_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                printText = "\n================================\n    THE MAHARASHTRA AYYAPPA \n      SEVA SANGHAM (REGD.) \n--------------------------------\n    Regd. No: MAH-373/Thane    \n         - Mohone            \n  || Swamiye Saranam Ayyappa ||\n================================\nName     : " + name + "\nDate     : " + date + "\nAmount   : Rs " + amount + "\nReceiver : " + receiver + "\nPayment  : " + paymentMode + "\nStatus   : " + status + "\n--------------------------------\n   Thank you for your support!\n================================\n";
+                printText = "\n================================\n    THE MAHARASHTRA AYYAPPA \n      SEVA SANGHAM (REGD.) \n    Regd. No: MAH-373/Thane    \n           Mohone          \n--------------------------------\n || Swamiye Saranam Ayyappa ||\n================================\nSerial No  : " + (serialNumber !== null && serialNumber !== void 0 ? serialNumber : 'N/A') + "\nName       : " + name + "\nDate       : " + date + "\nAmount     : Rs " + amount + "\nReceiver   : " + receiver + "\nPayment    : " + paymentMode + "\nStatus     : " + status + "\n--------------------------------\n  Thank you for your support!\n================================\n";
                 _a.label = 1;
             case 1:
                 _a.trys.push([1, 3, , 4]);
