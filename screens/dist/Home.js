@@ -60,7 +60,7 @@ var customParseFormat_1 = require("dayjs/plugin/customParseFormat");
 var react_native_modal_datetime_picker_1 = require("react-native-modal-datetime-picker");
 var react_native_fs_1 = require("react-native-fs");
 var xlsx_1 = require("xlsx");
-var react_native_html_to_pdf_1 = require("react-native-html-to-pdf");
+// import RNHTMLtoPDF from 'react-native-html-to-pdf';
 dayjs_1["default"].extend(customParseFormat_1["default"]);
 var Home = function (_a) {
     var navigation = _a.navigation;
@@ -215,11 +215,11 @@ var Home = function (_a) {
         setFilteredRecords(filtered);
     }, [searchQuery, startDate, endDate, records]);
     var handleDownload = function () { return __awaiter(void 0, void 0, void 0, function () {
-        var ws, wb, wbout, now, dateTime, path, html, file, error_2;
+        var ws, wb, wbout, now, dateTime, path, error_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    _a.trys.push([0, 5, , 6]);
+                    _a.trys.push([0, 3, , 4]);
                     if (filteredRecords.length === 0) {
                         react_native_1.Alert.alert('No Data', 'No records available to download.');
                         return [2 /*return*/];
@@ -236,31 +236,16 @@ var Home = function (_a) {
                 case 1:
                     _a.sent();
                     react_native_1.Alert.alert('Success', "File saved to: " + path);
-                    return [3 /*break*/, 4];
+                    return [3 /*break*/, 2];
                 case 2:
-                    html = "\n          <h2>Donation Records</h2>\n          <table border=\"1\" style=\"width:100%;border-collapse:collapse\">\n            <tr><th>Name</th><th>Date</th><th>Amount</th><th>Receiver</th></tr>\n            " + filteredRecords
-                        .map(function (item) {
-                        return "<tr><td>" + item.name + "</td><td>" + item.date + "</td><td>" + item.amount + "</td><td>" + item.receiver + "</td></tr>";
-                    })
-                        .join('') + "</table>";
-                    return [4 /*yield*/, react_native_html_to_pdf_1["default"].convert({
-                            html: html,
-                            fileName: 'donations',
-                            directory: 'Download'
-                        })];
-                case 3:
-                    file = _a.sent();
-                    react_native_1.Alert.alert('Success', "PDF saved to: " + file.filePath);
-                    _a.label = 4;
-                case 4:
                     setDownloadModalVisible(false);
-                    return [3 /*break*/, 6];
-                case 5:
+                    return [3 /*break*/, 4];
+                case 3:
                     error_2 = _a.sent();
                     console.error(error_2);
                     react_native_1.Alert.alert('Error', 'Download failed.');
-                    return [3 /*break*/, 6];
-                case 6: return [2 /*return*/];
+                    return [3 /*break*/, 4];
+                case 4: return [2 /*return*/];
             }
         });
     }); };

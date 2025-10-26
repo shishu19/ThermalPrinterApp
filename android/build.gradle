@@ -7,22 +7,30 @@ buildscript {
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
     }
+
     repositories {
         google()
         mavenCentral()
-        maven {
-            url "https://jcenter.bintray.com/"
-        }
+        // ⚠️ JCenter is deprecated — remove unless required
+        // maven { url "https://jcenter.bintray.com/" }
     }
+
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
+        // ✅ Compatible with Gradle 8.x–9.x and RN 0.80+
+        classpath("com.android.tools.build:gradle:8.7.3")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath 'com.google.gms:google-services:4.4.3'
+        classpath("com.google.gms:google-services:4.4.3")
     }
 }
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+    }
+}
+
+// ✅ Must apply AFTER buildscript (not before)
 apply plugin: "com.facebook.react.rootproject"
-apply plugin: "com.google.gms.google-services"
-
-

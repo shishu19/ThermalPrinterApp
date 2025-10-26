@@ -23,7 +23,7 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import RNFS from 'react-native-fs';
 import XLSX from 'xlsx';
-import RNHTMLtoPDF from 'react-native-html-to-pdf';
+// import RNHTMLtoPDF from 'react-native-html-to-pdf';
 
 dayjs.extend(customParseFormat);
 
@@ -188,22 +188,22 @@ const Home = ({ navigation }: Props) => {
         await RNFS.writeFile(path, wbout, 'base64');
         Alert.alert('Success', `File saved to: ${path}`);
       } else {
-        const html = `
-          <h2>Donation Records</h2>
-          <table border="1" style="width:100%;border-collapse:collapse">
-            <tr><th>Name</th><th>Date</th><th>Amount</th><th>Receiver</th></tr>
-            ${filteredRecords
-              .map(
-                (item) =>
-                  `<tr><td>${item.name}</td><td>${item.date}</td><td>${item.amount}</td><td>${item.receiver}</td></tr>`
-              )
-              .join('')}</table>`;
-        const file = await RNHTMLtoPDF.convert({
-          html,
-          fileName: 'donations',
-          directory: 'Download',
-        });
-        Alert.alert('Success', `PDF saved to: ${file.filePath}`);
+        // const html = `
+        //   <h2>Donation Records</h2>
+        //   <table border="1" style="width:100%;border-collapse:collapse">
+        //     <tr><th>Name</th><th>Date</th><th>Amount</th><th>Receiver</th></tr>
+        //     ${filteredRecords
+        //       .map(
+        //         (item) =>
+        //           `<tr><td>${item.name}</td><td>${item.date}</td><td>${item.amount}</td><td>${item.receiver}</td></tr>`
+        //       )
+        //       .join('')}</table>`;
+        // const file = await RNHTMLtoPDF.convert({
+        //   html,
+        //   fileName: 'donations',
+        //   directory: 'Download',
+        // });
+        // Alert.alert('Success', `PDF saved to: ${file.filePath}`);
       }
 
       setDownloadModalVisible(false);

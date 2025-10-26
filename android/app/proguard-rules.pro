@@ -8,3 +8,6 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+# Keep JAI ImageIO classes
+-keep class com.github.jaiimageio.impl.** { *; }
+-dontwarn javax.imageio.**
