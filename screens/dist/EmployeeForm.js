@@ -1,4 +1,7 @@
 "use strict";
+// DonationForm / EmployeeForm — FINAL VERSION
+// Serial number PREVIEW on load (NO increment)
+// Serial number increments ONLY on Add button click
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -63,16 +66,33 @@ var EmployeeForm = function (_a) {
     var _y = react_1.useState(false), loading = _y[0], setLoading = _y[1];
     var _z = react_1.useState(false), printing = _z[0], setPrinting = _z[1];
     var _0 = react_1.useState(initialDate || ''), date = _0[0], setDate = _0[1];
-    // -----------------------------------------------------
-    // ✅ 100% Safe Increment Serial Number (No Duplicates)
-    // -----------------------------------------------------
+    // ============================
+    //   SERIAL NUMBER FUNCTIONS
+    // ============================
+    // 1. PREVIEW NEXT SERIAL WITHOUT incrementing
+    var peekNextSerial = function () { return __awaiter(void 0, void 0, void 0, function () {
+        var db, counterRef, snapshot, current;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    db = database_1.getDatabase(firebaseConfig_1["default"]);
+                    counterRef = database_1.ref(db, '/counters/serialNumber');
+                    return [4 /*yield*/, database_1.get(counterRef)];
+                case 1:
+                    snapshot = _a.sent();
+                    current = snapshot.val() || 0;
+                    return [2 /*return*/, current + 1]; // only preview
+            }
+        });
+    }); };
+    // 2. ACTUAL increment (only on Add)
     var getNextSerialNumber = function () { return __awaiter(void 0, void 0, void 0, function () {
         var db, counterRef, result;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     db = database_1.getDatabase(firebaseConfig_1["default"]);
-                    counterRef = database_1.ref(db, "/counters/serialNumber");
+                    counterRef = database_1.ref(db, '/counters/serialNumber');
                     return [4 /*yield*/, database_1.runTransaction(counterRef, function (current) {
                             return (current || 0) + 1;
                         })];
@@ -82,17 +102,15 @@ var EmployeeForm = function (_a) {
             }
         });
     }); };
-    // -----------------------------------------------------
-    // AUTO GET SERIAL NUMBER ON NEW ENTRY
-    // -----------------------------------------------------
+    // On screen load, PREVIEW next serial (no increment)
     react_1.useEffect(function () {
-        var assignSerial = function () { return __awaiter(void 0, void 0, void 0, function () {
+        var loadSerial = function () { return __awaiter(void 0, void 0, void 0, function () {
             var nextSN;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         if (!(!isEditMode && !serialNumber)) return [3 /*break*/, 2];
-                        return [4 /*yield*/, getNextSerialNumber()];
+                        return [4 /*yield*/, peekNextSerial()];
                     case 1:
                         nextSN = _a.sent();
                         setSerialNumber(String(nextSN));
@@ -102,35 +120,37 @@ var EmployeeForm = function (_a) {
                 }
             });
         }); };
-        assignSerial();
-    }, [isEditMode, serialNumber]);
+        loadSerial();
+    }, []);
+    // ============================
+    //     PRINTER AUTO CONNECT
+    // ============================
     native_1.useFocusEffect(react_1.useCallback(function () {
         var reconnectPrinter = function () { return __awaiter(void 0, void 0, void 0, function () {
-            var savedMac, savedName, err_1;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
+            var savedMac, savedName, _a;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
                     case 0: return [4 /*yield*/, async_storage_1["default"].getItem('printer_mac')];
                     case 1:
-                        savedMac = _a.sent();
+                        savedMac = _b.sent();
                         return [4 /*yield*/, async_storage_1["default"].getItem('printer_name')];
                     case 2:
-                        savedName = _a.sent();
+                        savedName = _b.sent();
                         if (!savedMac) return [3 /*break*/, 8];
-                        _a.label = 3;
+                        _b.label = 3;
                     case 3:
-                        _a.trys.push([3, 6, , 7]);
+                        _b.trys.push([3, 6, , 7]);
                         return [4 /*yield*/, react_native_thermal_receipt_printer_1.BLEPrinter.init()];
                     case 4:
-                        _a.sent();
+                        _b.sent();
                         return [4 /*yield*/, react_native_thermal_receipt_printer_1.BLEPrinter.connectPrinter(savedMac)];
                     case 5:
-                        _a.sent();
+                        _b.sent();
                         setConnectedInfo({ mac: savedMac, name: savedName || 'Unknown Device' });
                         global.printerConnected = true;
                         return [3 /*break*/, 7];
                     case 6:
-                        err_1 = _a.sent();
-                        console.error('❌ Reconnect failed:', err_1);
+                        _a = _b.sent();
                         setConnectedInfo(null);
                         global.printerConnected = false;
                         return [3 /*break*/, 7];
@@ -138,13 +158,16 @@ var EmployeeForm = function (_a) {
                     case 8:
                         setConnectedInfo(null);
                         global.printerConnected = false;
-                        _a.label = 9;
+                        _b.label = 9;
                     case 9: return [2 /*return*/];
                 }
             });
         }); };
         reconnectPrinter();
     }, []));
+    // ============================
+    //      HEADER UI
+    // ============================
     react_1.useLayoutEffect(function () {
         navigation.setOptions({
             title: 'Donation',
@@ -158,6 +181,9 @@ var EmployeeForm = function (_a) {
             }
         });
     }, [navigation, connectedInfo]);
+    // ============================
+    //     UTILS
+    // ============================
     var formatDate = function (inputDate) {
         var day = String(inputDate.getDate()).padStart(2, '0');
         var month = String(inputDate.getMonth() + 1).padStart(2, '0');
@@ -170,7 +196,7 @@ var EmployeeForm = function (_a) {
         return day + "-" + month + "-" + year + " " + formattedHours + ":" + minutes + " " + ampm;
     };
     var getCurrentDateTime = function () { return formatDate(new Date()); };
-    var validateFields = function () {
+    var validate = function () {
         if (!name.trim() || !amount.trim() || !receiver.trim()) {
             react_native_1.Alert.alert('Validation Error', 'Name, Amount and Receiver are required.');
             return false;
@@ -181,73 +207,82 @@ var EmployeeForm = function (_a) {
         }
         return true;
     };
+    // ============================
+    //     ADD / EDIT HANDLER
+    // ============================
     var handleAddOrEdit = function () { return __awaiter(void 0, void 0, void 0, function () {
-        var formData, db, donationRef, donationId, error_1;
-        var _a, _b;
-        return __generator(this, function (_c) {
-            switch (_c.label) {
+        var db, donationRef, newSN, donationId, currentDateTime, e_1;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
                 case 0:
-                    if (!validateFields())
+                    if (!validate())
                         return [2 /*return*/];
                     setLoading(true);
-                    formData = {
-                        serialNumber: serialNumber,
-                        name: name.trim(),
-                        amount: parseFloat(amount) || 0,
-                        receiver: receiver.trim(),
-                        mobile: mobile.trim(),
-                        paymentMode: paymentMode,
-                        status: status,
-                        date: date
-                    };
                     db = database_1.getDatabase(firebaseConfig_1["default"]);
-                    _c.label = 1;
+                    _a.label = 1;
                 case 1:
-                    _c.trys.push([1, 6, 7, 8]);
+                    _a.trys.push([1, 7, 8, 9]);
                     if (!(isEditMode && id)) return [3 /*break*/, 3];
                     donationRef = database_1.ref(db, "/donations/" + id);
-                    return [4 /*yield*/, database_1.update(donationRef, formData)];
+                    return [4 /*yield*/, database_1.update(donationRef, {
+                            serialNumber: serialNumber,
+                            name: name.trim(),
+                            amount: parseFloat(amount) || 0,
+                            receiver: receiver.trim(),
+                            mobile: mobile.trim(),
+                            paymentMode: paymentMode,
+                            status: status,
+                            date: date
+                        })];
                 case 2:
-                    _c.sent();
-                    react_native_1.Alert.alert('✅ Updated Successfully');
-                    return [3 /*break*/, 5];
-                case 3:
-                    donationId = uuid_1.v4();
-                    return [4 /*yield*/, database_1.set(database_1.ref(db, "/donations/" + donationId), formData)];
+                    _a.sent();
+                    react_native_1.Alert.alert('Updated Successfully');
+                    return [3 /*break*/, 6];
+                case 3: return [4 /*yield*/, getNextSerialNumber()];
                 case 4:
-                    _c.sent();
-                    react_native_1.Alert.alert('✅ Donation Added Successfully', '', [
-                        {
-                            text: 'OK',
-                            onPress: function () {
-                                setIsEditing(false);
-                                setShowPreview(true);
-                            }
-                        },
-                    ]);
-                    return [2 /*return*/];
+                    newSN = _a.sent();
+                    donationId = uuid_1.v4();
+                    currentDateTime = getCurrentDateTime();
+                    return [4 /*yield*/, database_1.set(database_1.ref(db, "/donations/" + donationId), {
+                            serialNumber: newSN,
+                            name: name.trim(),
+                            amount: parseFloat(amount) || 0,
+                            receiver: receiver.trim(),
+                            mobile: mobile.trim(),
+                            paymentMode: paymentMode,
+                            status: status,
+                            date: currentDateTime
+                        })];
                 case 5:
+                    _a.sent();
+                    setSerialNumber(String(newSN));
+                    setDate(currentDateTime);
+                    react_native_1.Alert.alert('Donation Added Successfully');
+                    _a.label = 6;
+                case 6:
                     setIsEditing(false);
                     setShowPreview(true);
-                    return [3 /*break*/, 8];
-                case 6:
-                    error_1 = _c.sent();
-                    console.error('❌ Firebase Error:', (_a = error_1 === null || error_1 === void 0 ? void 0 : error_1.message) !== null && _a !== void 0 ? _a : error_1);
-                    react_native_1.Alert.alert('Error', "Failed to save donation: " + ((_b = error_1 === null || error_1 === void 0 ? void 0 : error_1.message) !== null && _b !== void 0 ? _b : 'Unknown error'));
-                    return [3 /*break*/, 8];
+                    return [3 /*break*/, 9];
                 case 7:
+                    e_1 = _a.sent();
+                    react_native_1.Alert.alert('Error', e_1.message || 'Unknown error');
+                    return [3 /*break*/, 9];
+                case 8:
                     setLoading(false);
                     return [7 /*endfinally*/];
-                case 8: return [2 /*return*/];
+                case 9: return [2 /*return*/];
             }
         });
     }); };
+    // ============================
+    //     PRINT HANDLER
+    // ============================
     var handlePrint = function () { return __awaiter(void 0, void 0, void 0, function () {
         var success;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    if (!validateFields())
+                    if (!validate())
                         return [2 /*return*/];
                     if (!global.printerConnected) {
                         react_native_1.Alert.alert('Printer Error', 'Printer not connected!');
@@ -260,9 +295,8 @@ var EmployeeForm = function (_a) {
                     return [4 /*yield*/, Printer_1.printSampleReceipt(name, date, amount, receiver, mobile, paymentMode, status, serialNumber)];
                 case 2:
                     success = _a.sent();
-                    if (success) {
+                    if (success)
                         navigation.navigate('Home');
-                    }
                     return [3 /*break*/, 4];
                 case 3:
                     setPrinting(false);
@@ -271,12 +305,9 @@ var EmployeeForm = function (_a) {
             }
         });
     }); };
-    var handleEditClick = function () {
-        var updatedDate = getCurrentDateTime();
-        setDate(updatedDate);
-        setIsEditing(true);
-        setShowPreview(false);
-    };
+    // ============================
+    //       RENDER UI
+    // ============================
     return (react_1["default"].createElement(react_native_1.View, { style: styles.wrapper },
         react_1["default"].createElement(react_native_1.ScrollView, { contentContainerStyle: styles.container },
             isEditing && (react_1["default"].createElement(react_1["default"].Fragment, null,
@@ -340,13 +371,16 @@ var EmployeeForm = function (_a) {
                 react_1["default"].createElement(react_native_1.Text, { style: styles.previewText }, "====================================="),
                 react_1["default"].createElement(react_native_1.TouchableOpacity, { style: [styles.printButton, printing && { backgroundColor: '#aaa' }], onPress: handlePrint, disabled: printing },
                     react_1["default"].createElement(react_native_1.Text, { style: styles.printButtonText }, printing ? 'Printing...' : '🖨️ Print')),
-                isEditMode && (react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: handleEditClick, style: styles.editIcon },
+                isEditMode && (react_1["default"].createElement(react_native_1.TouchableOpacity, { onPress: function () { setShowPreview(false); setIsEditing(true); }, style: styles.editIcon },
                     react_1["default"].createElement(react_native_1.Text, { style: { color: '#fff', fontSize: 18 } }, "\u270F\uFE0F")))))),
         react_1["default"].createElement(react_native_1.Text, { style: [styles.footer, connectedInfo ? styles.connected : styles.disconnected] }, connectedInfo
             ? "\uD83D\uDDA8 Connected to: " + connectedInfo.name + " (" + connectedInfo.mac + ")"
             : '🔌 No printer connected')));
 };
 exports["default"] = EmployeeForm;
+// ============================
+//       STYLES
+// ============================
 var styles = react_native_1.StyleSheet.create({
     wrapper: { flex: 1, backgroundColor: '#fff', justifyContent: 'space-between' },
     container: { padding: 20, paddingBottom: 40 },

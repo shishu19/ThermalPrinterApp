@@ -1,3 +1,7 @@
+// DonationForm / EmployeeForm — FINAL VERSION
+// Serial number PREVIEW on load (NO increment)
+// Serial number increments ONLY on Add button click
+
 import React, { useState, useLayoutEffect, useCallback, useEffect } from 'react';
 import {
   View,
@@ -15,7 +19,7 @@ import { printSampleReceipt } from './Printer';
 import { BLEPrinter } from 'react-native-thermal-receipt-printer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { ref, update, getDatabase, set, runTransaction } from 'firebase/database';
+import { ref, update, getDatabase, set, get, runTransaction } from 'firebase/database';
 import app from './firebaseConfig';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -51,12 +55,24 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   const [printing, setPrinting] = useState(false);
   const [date, setDate] = useState(initialDate || '');
 
-  // -----------------------------------------------------
-  // ✅ 100% Safe Increment Serial Number (No Duplicates)
-  // -----------------------------------------------------
+  // ============================
+  //   SERIAL NUMBER FUNCTIONS
+  // ============================
+
+  // 1. PREVIEW NEXT SERIAL WITHOUT incrementing
+  const peekNextSerial = async () => {
+    const db = getDatabase(app);
+    const counterRef = ref(db, '/counters/serialNumber');
+
+    const snapshot = await get(counterRef);
+    const current = snapshot.val() || 0;
+    return current + 1; // only preview
+  };
+
+  // 2. ACTUAL increment (only on Add)
   const getNextSerialNumber = async () => {
     const db = getDatabase(app);
-    const counterRef = ref(db, "/counters/serialNumber");
+    const counterRef = ref(db, '/counters/serialNumber');
 
     const result = await runTransaction(counterRef, (current) => {
       return (current || 0) + 1;
@@ -65,19 +81,21 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     return result.snapshot.val();
   };
 
-  // -----------------------------------------------------
-  // AUTO GET SERIAL NUMBER ON NEW ENTRY
-  // -----------------------------------------------------
+  // On screen load, PREVIEW next serial (no increment)
   useEffect(() => {
-    const assignSerial = async () => {
+    const loadSerial = async () => {
       if (!isEditMode && !serialNumber) {
-        const nextSN = await getNextSerialNumber();
+        const nextSN = await peekNextSerial();
         setSerialNumber(String(nextSN));
         setDate(getCurrentDateTime());
       }
     };
-    assignSerial();
-  }, [isEditMode, serialNumber]);
+    loadSerial();
+  }, []);
+
+  // ============================
+  //     PRINTER AUTO CONNECT
+  // ============================
 
   useFocusEffect(
     useCallback(() => {
@@ -90,8 +108,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
             await BLEPrinter.connectPrinter(savedMac);
             setConnectedInfo({ mac: savedMac, name: savedName || 'Unknown Device' });
             (global as any).printerConnected = true;
-          } catch (err) {
-            console.error('❌ Reconnect failed:', err);
+          } catch {
             setConnectedInfo(null);
             (global as any).printerConnected = false;
           }
@@ -104,6 +121,10 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
       reconnectPrinter();
     }, [])
   );
+
+  // ============================
+  //      HEADER UI
+  // ============================
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -124,6 +145,10 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     });
   }, [navigation, connectedInfo]);
 
+  // ============================
+  //     UTILS
+  // ============================
+
   const formatDate = (inputDate: Date): string => {
     const day = String(inputDate.getDate()).padStart(2, '0');
     const month = String(inputDate.getMonth() + 1).padStart(2, '0');
@@ -138,7 +163,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
 
   const getCurrentDateTime = () => formatDate(new Date());
 
-  const validateFields = () => {
+  const validate = () => {
     if (!name.trim() || !amount.trim() || !receiver.trim()) {
       Alert.alert('Validation Error', 'Name, Amount and Receiver are required.');
       return false;
@@ -152,56 +177,70 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     return true;
   };
 
+  // ============================
+  //     ADD / EDIT HANDLER
+  // ============================
+
   const handleAddOrEdit = async () => {
-    if (!validateFields()) return;
+    if (!validate()) return;
 
     setLoading(true);
-
-    const formData = {
-      serialNumber,
-      name: name.trim(),
-      amount: parseFloat(amount) || 0,
-      receiver: receiver.trim(),
-      mobile: mobile.trim(),
-      paymentMode,
-      status,
-      date,
-    };
-
     const db = getDatabase(app);
 
     try {
       if (isEditMode && id) {
+        // EDIT MODE
         const donationRef = ref(db, `/donations/${id}`);
-        await update(donationRef, formData);
-        Alert.alert('✅ Updated Successfully');
+        await update(donationRef, {
+          serialNumber,
+          name: name.trim(),
+          amount: parseFloat(amount) || 0,
+          receiver: receiver.trim(),
+          mobile: mobile.trim(),
+          paymentMode,
+          status,
+          date,
+        });
+
+        Alert.alert('Updated Successfully');
       } else {
+        // ADD MODE — REAL INCREMENT ONLY HERE
+        const newSN = await getNextSerialNumber();
         const donationId = uuidv4();
-        await set(ref(db, `/donations/${donationId}`), formData);
-        Alert.alert('✅ Donation Added Successfully', '', [
-          {
-            text: 'OK',
-            onPress: () => {
-              setIsEditing(false);
-              setShowPreview(true);
-            },
-          },
-        ]);
-        return;
+        const currentDateTime = getCurrentDateTime();
+
+        await set(ref(db, `/donations/${donationId}`), {
+          serialNumber: newSN,
+          name: name.trim(),
+          amount: parseFloat(amount) || 0,
+          receiver: receiver.trim(),
+          mobile: mobile.trim(),
+          paymentMode,
+          status,
+          date: currentDateTime,
+        });
+
+        setSerialNumber(String(newSN));
+        setDate(currentDateTime);
+
+        Alert.alert('Donation Added Successfully');
       }
 
       setIsEditing(false);
       setShowPreview(true);
-    } catch (error: any) {
-      console.error('❌ Firebase Error:', error?.message ?? error);
-      Alert.alert('Error', `Failed to save donation: ${error?.message ?? 'Unknown error'}`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Unknown error');
     } finally {
       setLoading(false);
     }
   };
 
+  // ============================
+  //     PRINT HANDLER
+  // ============================
+
   const handlePrint = async () => {
-    if (!validateFields()) return;
+    if (!validate()) return;
 
     if (!(global as any).printerConnected) {
       Alert.alert('Printer Error', 'Printer not connected!');
@@ -220,20 +259,15 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
         status,
         serialNumber
       );
-      if (success) {
-        navigation.navigate('Home');
-      }
+      if (success) navigation.navigate('Home');
     } finally {
       setPrinting(false);
     }
   };
 
-  const handleEditClick = () => {
-    const updatedDate = getCurrentDateTime();
-    setDate(updatedDate);
-    setIsEditing(true);
-    setShowPreview(false);
-  };
+  // ============================
+  //       RENDER UI
+  // ============================
 
   return (
     <View style={styles.wrapper}>
@@ -323,7 +357,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
             </TouchableOpacity>
 
             {isEditMode && (
-              <TouchableOpacity onPress={handleEditClick} style={styles.editIcon}>
+              <TouchableOpacity onPress={() => { setShowPreview(false); setIsEditing(true); }} style={styles.editIcon}>
                 <Text style={{ color: '#fff', fontSize: 18 }}>✏️</Text>
               </TouchableOpacity>
             )}
@@ -341,6 +375,10 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
 };
 
 export default EmployeeForm;
+
+// ============================
+//       STYLES
+// ============================
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1, backgroundColor: '#fff', justifyContent: 'space-between' },
