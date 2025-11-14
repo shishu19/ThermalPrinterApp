@@ -48,9 +48,7 @@ var firebaseConfig_1 = require("./firebaseConfig");
 var uuid_1 = require("uuid");
 var EmployeeForm = function (_a) {
     var route = _a.route, navigation = _a.navigation;
-    var _b = route.params || {}, _c = _b.id, id = _c === void 0 ? '' : _c, _d = _b.serialNumber, initialSerialNumber = _d === void 0 ? '' : _d, _e = _b.name, initialName = _e === void 0 ? '' : _e, _f = _b.amount, initialAmount = _f === void 0 ? '' : _f, _g = _b.receiver, initialReceiver = _g === void 0 ? '' : _g, _h = _b.mobile, initialMobile = _h === void 0 ? '' : _h, _j = _b.paymentMode, initialPaymentMode = _j === void 0 ? 'Cash' : _j, _k = _b.status, initialStatus = _k === void 0 ? 'Pending' : _k, _l = _b.date, initialDate = _l === void 0 ? '' : _l, // ✅ incoming date from Home
-    _m = _b.mode, // ✅ incoming date from Home
-    mode = _m === void 0 ? 'add' : _m;
+    var _b = route.params || {}, _c = _b.id, id = _c === void 0 ? '' : _c, _d = _b.serialNumber, initialSerialNumber = _d === void 0 ? '' : _d, _e = _b.name, initialName = _e === void 0 ? '' : _e, _f = _b.amount, initialAmount = _f === void 0 ? '' : _f, _g = _b.receiver, initialReceiver = _g === void 0 ? '' : _g, _h = _b.mobile, initialMobile = _h === void 0 ? '' : _h, _j = _b.paymentMode, initialPaymentMode = _j === void 0 ? 'Cash' : _j, _k = _b.status, initialStatus = _k === void 0 ? 'Pending' : _k, _l = _b.date, initialDate = _l === void 0 ? '' : _l, _m = _b.mode, mode = _m === void 0 ? 'add' : _m;
     var isEditMode = mode === 'edit';
     var _o = react_1.useState(initialName), name = _o[0], setName = _o[1];
     var _p = react_1.useState(initialSerialNumber || ''), serialNumber = _p[0], setSerialNumber = _p[1];
@@ -64,22 +62,48 @@ var EmployeeForm = function (_a) {
     var _x = react_1.useState(null), connectedInfo = _x[0], setConnectedInfo = _x[1];
     var _y = react_1.useState(false), loading = _y[0], setLoading = _y[1];
     var _z = react_1.useState(false), printing = _z[0], setPrinting = _z[1];
-    var _0 = react_1.useState(initialDate || ''), date = _0[0], setDate = _0[1]; // ✅ Store the correct date
-    // ✅ Generate unique serial number with date
-    var generateSerialNumber = function () {
-        var now = new Date();
-        var datePart = "" + now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var randomPart = Math.floor(1000 + Math.random() * 9000); // random 4-digit
-        return "SN-" + datePart + "-" + randomPart;
-    };
+    var _0 = react_1.useState(initialDate || ''), date = _0[0], setDate = _0[1];
+    // -----------------------------------------------------
+    // ✅ 100% Safe Increment Serial Number (No Duplicates)
+    // -----------------------------------------------------
+    var getNextSerialNumber = function () { return __awaiter(void 0, void 0, void 0, function () {
+        var db, counterRef, result;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    db = database_1.getDatabase(firebaseConfig_1["default"]);
+                    counterRef = database_1.ref(db, "/counters/serialNumber");
+                    return [4 /*yield*/, database_1.runTransaction(counterRef, function (current) {
+                            return (current || 0) + 1;
+                        })];
+                case 1:
+                    result = _a.sent();
+                    return [2 /*return*/, result.snapshot.val()];
+            }
+        });
+    }); };
+    // -----------------------------------------------------
+    // AUTO GET SERIAL NUMBER ON NEW ENTRY
+    // -----------------------------------------------------
     react_1.useEffect(function () {
-        if (!isEditMode && !serialNumber) {
-            var newSN = generateSerialNumber();
-            setSerialNumber(newSN);
-            var now = new Date();
-            setDate(getCurrentDateTime());
-        }
-    }, [isEditMode, serialNumber, date]);
+        var assignSerial = function () { return __awaiter(void 0, void 0, void 0, function () {
+            var nextSN;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!(!isEditMode && !serialNumber)) return [3 /*break*/, 2];
+                        return [4 /*yield*/, getNextSerialNumber()];
+                    case 1:
+                        nextSN = _a.sent();
+                        setSerialNumber(String(nextSN));
+                        setDate(getCurrentDateTime());
+                        _a.label = 2;
+                    case 2: return [2 /*return*/];
+                }
+            });
+        }); };
+        assignSerial();
+    }, [isEditMode, serialNumber]);
     native_1.useFocusEffect(react_1.useCallback(function () {
         var reconnectPrinter = function () { return __awaiter(void 0, void 0, void 0, function () {
             var savedMac, savedName, err_1;
@@ -233,8 +257,7 @@ var EmployeeForm = function (_a) {
                     _a.label = 1;
                 case 1:
                     _a.trys.push([1, , 3, 4]);
-                    return [4 /*yield*/, Printer_1.printSampleReceipt(name, date, // ✅ Use correct stored date
-                        amount, receiver, mobile, paymentMode, status, serialNumber)];
+                    return [4 /*yield*/, Printer_1.printSampleReceipt(name, date, amount, receiver, mobile, paymentMode, status, serialNumber)];
                 case 2:
                     success = _a.sent();
                     if (success) {
@@ -249,7 +272,6 @@ var EmployeeForm = function (_a) {
         });
     }); };
     var handleEditClick = function () {
-        // ✅ Only update date when user clicks ✏️ to edit
         var updatedDate = getCurrentDateTime();
         setDate(updatedDate);
         setIsEditing(true);

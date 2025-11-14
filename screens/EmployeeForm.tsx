@@ -15,7 +15,7 @@ import { printSampleReceipt } from './Printer';
 import { BLEPrinter } from 'react-native-thermal-receipt-printer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { ref, update, getDatabase, set } from 'firebase/database';
+import { ref, update, getDatabase, set, runTransaction } from 'firebase/database';
 import app from './firebaseConfig';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -31,7 +31,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     mobile: initialMobile = '',
     paymentMode: initialPaymentMode = 'Cash',
     status: initialStatus = 'Pending',
-    date: initialDate = '', // ✅ incoming date from Home
+    date: initialDate = '',
     mode = 'add',
   } = route.params || {};
 
@@ -49,26 +49,35 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   const [connectedInfo, setConnectedInfo] = useState<{ mac: string; name: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [printing, setPrinting] = useState(false);
-  const [date, setDate] = useState(initialDate || ''); // ✅ Store the correct date
+  const [date, setDate] = useState(initialDate || '');
 
-  // ✅ Generate unique serial number with date
-  const generateSerialNumber = () => {
-    const now = new Date();
-    const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(
-      now.getDate()
-    ).padStart(2, '0')}`;
-    const randomPart = Math.floor(1000 + Math.random() * 9000); // random 4-digit
-    return `SN-${datePart}-${randomPart}`;
+  // -----------------------------------------------------
+  // ✅ 100% Safe Increment Serial Number (No Duplicates)
+  // -----------------------------------------------------
+  const getNextSerialNumber = async () => {
+    const db = getDatabase(app);
+    const counterRef = ref(db, "/counters/serialNumber");
+
+    const result = await runTransaction(counterRef, (current) => {
+      return (current || 0) + 1;
+    });
+
+    return result.snapshot.val();
   };
 
+  // -----------------------------------------------------
+  // AUTO GET SERIAL NUMBER ON NEW ENTRY
+  // -----------------------------------------------------
   useEffect(() => {
-    if (!isEditMode && !serialNumber) {
-      const newSN = generateSerialNumber();
-      setSerialNumber(newSN);
-      const now = new Date();
-      setDate(getCurrentDateTime());
-    }
-  }, [isEditMode, serialNumber,date]);
+    const assignSerial = async () => {
+      if (!isEditMode && !serialNumber) {
+        const nextSN = await getNextSerialNumber();
+        setSerialNumber(String(nextSN));
+        setDate(getCurrentDateTime());
+      }
+    };
+    assignSerial();
+  }, [isEditMode, serialNumber]);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,7 +157,6 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
 
     setLoading(true);
 
-    // ✅ Use updated date (if edited)
     const formData = {
       serialNumber,
       name: name.trim(),
@@ -157,7 +165,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
       mobile: mobile.trim(),
       paymentMode,
       status,
-      date, // ✅ store the existing or updated date
+      date,
     };
 
     const db = getDatabase(app);
@@ -204,7 +212,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
     try {
       const success = await printSampleReceipt(
         name,
-        date, // ✅ Use correct stored date
+        date,
         amount,
         receiver,
         mobile,
@@ -221,7 +229,6 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handleEditClick = () => {
-    // ✅ Only update date when user clicks ✏️ to edit
     const updatedDate = getCurrentDateTime();
     setDate(updatedDate);
     setIsEditing(true);
