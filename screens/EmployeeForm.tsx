@@ -377,7 +377,7 @@ const EmployeeForm: React.FC<Props> = ({ route, navigation }) => {
 export default EmployeeForm;
 
 // ============================
-//       STYLES
+//       STYLE
 // ============================
 
 const styles = StyleSheet.create({

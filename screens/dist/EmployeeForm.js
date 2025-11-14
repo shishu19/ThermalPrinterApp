@@ -379,7 +379,7 @@ var EmployeeForm = function (_a) {
 };
 exports["default"] = EmployeeForm;
 // ============================
-//       STYLES
+//       STYLE
 // ============================
 var styles = react_native_1.StyleSheet.create({
     wrapper: { flex: 1, backgroundColor: '#fff', justifyContent: 'space-between' },
